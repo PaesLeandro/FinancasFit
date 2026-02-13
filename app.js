@@ -354,21 +354,32 @@ function carregaListaDespesas(despesas = [], filtro = false) {
 
   lista.innerHTML = "";
 
-  despesas.forEach((d, idx) => {
+  despesas.forEach((d) => {
+    // Encontrar índice real no banco de dados
+    const todosDospesas = bd.recuperarTodosRegistros();
+    const indiceReal = todosDospesas.findIndex(item =>
+      item.ano === d.ano &&
+      item.mes === d.mes &&
+      item.dia === d.dia &&
+      item.descricao === d.descricao &&
+      item.valor === d.valor &&
+      item.tipo === d.tipo
+    );
+
     const dataVenc = `${String(d.dia).padStart(2, "0")}/${String(d.mes).padStart(2, "0")}/${d.ano}`;
     const valorFormatado = `R$ ${parseFloat(d.valor).toFixed(2).replace(".", ",")}`;
 
     const linha = `
       <tr class="fade-in-row">
         <td>
-          <input type="checkbox" class="checkDespesa" value="${idx}" onchange="atualizarBotaoExcluir()" />
+          <input type="checkbox" class="checkDespesa" value="${indiceReal}" onchange="atualizarBotaoExcluir()" />
         </td>
         <td>${dataVenc}</td>
         <td>${d.cartao || getNomeCategoria(d.tipo)}</td>
         <td>${d.descricao}</td>
         <td class="text-right"><strong>${valorFormatado}</strong></td>
         <td class="text-center">
-          <button class="btn btn-danger btn-sm" onclick="removerDespesa(${idx})">
+          <button class="btn btn-danger btn-sm" onclick="removerDespesa(${indiceReal})">
             <i class="fas fa-trash"></i>
           </button>
         </td>
@@ -410,7 +421,19 @@ function removerDespesa(idx) {
   removedIndex = idx;
 
   bd.remover(idx);
-  carregaListaDespesas();
+  
+  // Recarregar lista com filtros mantidos
+  const ano = document.getElementById("ano")?.value || "";
+  const mes = document.getElementById("mes")?.value || "";
+  const tipo = document.getElementById("tipo")?.value || "";
+  const descricao = document.getElementById("descricao")?.value || "";
+  
+  if (ano || mes || tipo || descricao) {
+    const resultado = bd.pesquisar({ ano, mes, tipo, descricao });
+    carregaListaDespesas(resultado, true);
+  } else {
+    carregaListaDespesas();
+  }
 
   mostrarUndo();
   if (typeof atualizarResumoDespesas === "function") {
@@ -449,7 +472,21 @@ function excluirDespesasSelecionadas() {
   
   indices.forEach(idx => bd.remover(idx));
   
-  carregaListaDespesas();
+  // Recarregar lista mantendo os filtros atuais
+  const ano = document.getElementById("ano")?.value || "";
+  const mes = document.getElementById("mes")?.value || "";
+  const tipo = document.getElementById("tipo")?.value || "";
+  const descricao = document.getElementById("descricao")?.value || "";
+  
+  if (ano || mes || tipo || descricao) {
+    // Se há filtros, aplicar pesquisa
+    const resultado = bd.pesquisar({ ano, mes, tipo, descricao });
+    carregaListaDespesas(resultado, true);
+  } else {
+    // Se não há filtros, recarregar tudo
+    carregaListaDespesas();
+  }
+  
   if (typeof atualizarResumoDespesas === "function") {
     atualizarResumoDespesas();
   }
