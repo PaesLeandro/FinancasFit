@@ -223,40 +223,6 @@ function excluirCartao(idx) {
   exibirMensagem("✅ Cartão excluído com sucesso!", "Sucesso", "success");
 }
 
-// Cadastrar novo cartão
-if (document.getElementById("btnCadastrarCartao")) {
-  document.getElementById("btnCadastrarCartao").addEventListener("click", () => {
-    const nome = document.getElementById("nomeCartao").value.trim();
-    const bandeira = document.getElementById("bandeiraCartao").value;
-    const vencimento = parseInt(document.getElementById("vencimentoCartao").value);
-    const fechamento = parseInt(document.getElementById("fechamentoCartao").value);
-
-    if (!nome || !bandeira || !vencimento || !fechamento) {
-      alert("⚠️ Preencha todos os campos do cartão!");
-      return;
-    }
-
-    if (vencimento < 1 || vencimento > 31 || fechamento < 1 || fechamento > 31) {
-      alert("⚠️ Dias devem estar entre 1 e 31!");
-      return;
-    }
-
-    const cartoes = getCartoes();
-    cartoes.push({ nome, bandeira, vencimento, fechamento });
-    saveCartoes(cartoes);
-
-    document.getElementById("nomeCartao").value = "";
-    document.getElementById("bandeiraCartao").value = "";
-    document.getElementById("vencimentoCartao").value = "";
-    document.getElementById("fechamentoCartao").value = "";
-
-    atualizarListaCartoes();
-    carregarCartoesNoSelect();
-    carregarCartoesNoPdfImport();
-    exibirMensagem("✅ Cartão cadastrado com sucesso!", "Sucesso", "success");
-  });
-}
-
 // ==========================================
 // CÁLCULO DE VENCIMENTO
 // ==========================================
@@ -560,11 +526,14 @@ function atualizarResumoDespesas() {
     porCategoria[cat] = (porCategoria[cat] || 0) + parseFloat(d.valor);
   });
 
+  // Formatar total com separador de milhar
+  const totalFormatado = total.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
   let html = `
     <div class="row">
       <div class="col-md-6">
         <h6>💰 Total Geral</h6>
-        <h3 class="text-primary">R$ ${total.toFixed(2).replace(".", ",")}</h3>
+        <h3 class="text-primary">R$ ${totalFormatado}</h3>
       </div>
       <div class="col-md-6">
         <h6>📊 Total de Registros</h6>
@@ -577,7 +546,8 @@ function atualizarResumoDespesas() {
   `;
 
   Object.entries(porCategoria).forEach(([cat, val]) => {
-    html += `<li>${cat}: <strong>R$ ${val.toFixed(2).replace(".", ",")}</strong></li>`;
+    const valFormatado = val.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    html += `<li>${cat}: <strong>R$ ${valFormatado}</strong></li>`;
   });
 
   html += "</ul>";
@@ -676,7 +646,7 @@ function exportDespesasToPdf() {
     const rows = lista.map(d => [
       `${d.dia}/${d.mes}/${d.ano}`,
       d.descricao,
-      `R$ ${parseFloat(d.valor).toFixed(2).replace(".", ",")}`
+      `R$ ${parseFloat(d.valor).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`
     ]);
 
     doc.autoTable({
@@ -692,8 +662,9 @@ function exportDespesasToPdf() {
 
     doc.setFontSize(10);
     doc.setFont(undefined, "bold");
+    const totalCartaoFormatado = totalCartao.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     doc.text(
-      `Total: R$ ${totalCartao.toFixed(2).replace(".", ",")}`,
+      `Total: R$ ${totalCartaoFormatado}`,
       14,
       y
     );
@@ -1014,6 +985,41 @@ document.addEventListener("DOMContentLoaded", () => {
   if (inputData) {
     const hoje = new Date().toISOString().split("T")[0];
     inputData.value = hoje;
+  }
+
+  // Cadastrar novo cartão
+  const btnCadastrarCartao = document.getElementById("btnCadastrarCartao");
+  if (btnCadastrarCartao) {
+    btnCadastrarCartao.addEventListener("click", () => {
+      const nome = document.getElementById("nomeCartao").value.trim();
+      const bandeira = document.getElementById("bandeiraCartao").value;
+      const vencimento = parseInt(document.getElementById("vencimentoCartao").value);
+      const fechamento = parseInt(document.getElementById("fechamentoCartao").value);
+
+      if (!nome || !bandeira || !vencimento || !fechamento) {
+        alert("⚠️ Preencha todos os campos do cartão!");
+        return;
+      }
+
+      if (vencimento < 1 || vencimento > 31 || fechamento < 1 || fechamento > 31) {
+        alert("⚠️ Dias devem estar entre 1 e 31!");
+        return;
+      }
+
+      const cartoes = getCartoes();
+      cartoes.push({ nome, bandeira, vencimento, fechamento });
+      saveCartoes(cartoes);
+
+      document.getElementById("nomeCartao").value = "";
+      document.getElementById("bandeiraCartao").value = "";
+      document.getElementById("vencimentoCartao").value = "";
+      document.getElementById("fechamentoCartao").value = "";
+
+      atualizarListaCartoes();
+      carregarCartoesNoSelect();
+      carregarCartoesNoPdfImport();
+      exibirMensagem("✅ Cartão cadastrado com sucesso!", "Sucesso", "success");
+    });
   }
 
   // Import PDF button

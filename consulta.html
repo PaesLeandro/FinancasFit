@@ -331,27 +331,6 @@
         preencherCategorias();
         carregaListaDespesas();
         carregarCartoesNoPdfImport();
-
-        // Import PDF button
-        const btnImportarPdf = document.getElementById("btnImportarPdf");
-        console.log("Botão importar PDF:", btnImportarPdf);
-
-        if (btnImportarPdf) {
-          btnImportarPdf.addEventListener("click", () => {
-            console.log("Botão clicado!");
-            importarDespesasDePdf();
-          });
-        }
-
-        // Custom file input label
-        const inputPdf = document.getElementById("inputPdfFatura");
-        console.log("Input PDF:", inputPdf);
-
-        if (inputPdf) {
-          inputPdf.addEventListener("change", function () {
-            console.log("Arquivo selecionado:", this.files[0]);
-          });
-        }
       });
     </script>
   </body>
