@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
@@ -11,10 +11,10 @@
     />
     <link rel="stylesheet" href="css/custom.css" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <script
-      defer
-      src="https://use.fontawesome.com/releases/v5.0.8/js/all.js"
-    ></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -133,7 +133,9 @@
 
       <div class="card custom-card">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+          <div
+            class="d-flex justify-content-between align-items-center mb-3 flex-wrap"
+          >
             <h5 class="mb-2 mb-md-0">
               Resultados (<span id="totalRegistros">0</span>)
             </h5>
@@ -198,7 +200,8 @@
     <footer class="site-footer mt-5">
       <div class="container">
         <div class="footer-center">
-          &copy; <span id="currentYear"></span> - Desenvolvido por Paes_Tech Sistemas
+          &copy; <span id="currentYear"></span> - Desenvolvido por Paes_Tech
+          Sistemas
         </div>
       </div>
     </footer>
@@ -232,7 +235,7 @@
       document.getElementById("currentYear").textContent =
         new Date().getFullYear();
       document.addEventListener("DOMContentLoaded", () =>
-        carregaListaDespesas()
+        carregaListaDespesas(),
       );
 
       function limparTudo() {
@@ -251,7 +254,7 @@
 
         const total = d.reduce(
           (sum, item) => sum + (parseFloat(item.valor) || 0),
-          0
+          0,
         );
         document.getElementById("totalRegistros").textContent = d.length;
         document.getElementById("totalDespesas").textContent = `R$ ${total

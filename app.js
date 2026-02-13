@@ -593,7 +593,7 @@ function exportDespesasToPdf() {
   const doc = new jsPDF();
 
   doc.setFontSize(18);
-  doc.text("💰 Orçamento Pessoal - Relatório", 14, 20);
+  doc.text("Orcamento Pessoal - Relatorio", 14, 20);
 
   doc.setFontSize(10);
   doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 14, 28);
@@ -613,7 +613,7 @@ function exportDespesasToPdf() {
 
     doc.setFontSize(12);
     doc.setFont(undefined, "bold");
-    doc.text(`💳 ${cartao}`, 14, y);
+    doc.text(`Cartao: ${cartao}`, 14, y);
     doc.setFont(undefined, "normal");
     doc.setFontSize(10);
     y += 6;
