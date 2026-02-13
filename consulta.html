@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orçamento Pessoal - Consulta</title>
+
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    />
+    <link rel="stylesheet" href="css/custom.css" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <script
+      defer
+      src="https://use.fontawesome.com/releases/v5.0.8/js/all.js"
+    ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">
+          <span class="ml-2">💰 Orçamento Pessoal</span>
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-toggle="collapse"
+          data-target="#navbarNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html"
+                ><i class="fas fa-plus-circle"></i> Cadastro</a
+              >
+            </li>
+            <li class="nav-item active">
+              <a class="nav-link" href="consulta.html"
+                ><i class="fas fa-search"></i> Consulta</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="page-header mb-4">
+        <h1>🔍 Consulta de Despesas</h1>
+        <p class="small-muted">Visualize o que você vai pagar em cada mês</p>
+      </div>
+
+      <div class="card custom-card mb-4">
+        <div class="card-body">
+          <h5 class="card-title mb-3"><i class="fas fa-filter"></i> Filtros</h5>
+
+          <div class="form-row">
+            <div class="col-md-3 col-6 mb-2">
+              <select class="form-control" id="ano">
+                <option value="">Ano</option>
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+                <option value="2027">2027</option>
+                <option value="2028">2028</option>
+                <option value="2029">2029</option>
+                <option value="2030">2030</option>
+              </select>
+            </div>
+            <div class="col-md-3 col-6 mb-2">
+              <select class="form-control" id="mes">
+                <option value="">Mês</option>
+                <option value="1">Janeiro</option>
+                <option value="2">Fevereiro</option>
+                <option value="3">Março</option>
+                <option value="4">Abril</option>
+                <option value="5">Maio</option>
+                <option value="6">Junho</option>
+                <option value="7">Julho</option>
+                <option value="8">Agosto</option>
+                <option value="9">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-2">
+              <select class="form-control" id="tipo">
+                <option value="">Todas as categorias</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row mt-2">
+            <div class="col-md-8 mb-2">
+              <input
+                type="text"
+                class="form-control"
+                placeholder="Descrição..."
+                id="descricao"
+              />
+            </div>
+            <div class="col-md-2 mb-2">
+              <button
+                class="btn btn-primary btn-block"
+                onclick="pesquisarDespesa()"
+              >
+                <i class="fas fa-search"></i> Buscar
+              </button>
+            </div>
+            <div class="col-md-2 mb-2">
+              <button
+                class="btn btn-outline-secondary btn-block"
+                onclick="limparTudo()"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card custom-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+            <h5 class="mb-2 mb-md-0">
+              Resultados (<span id="totalRegistros">0</span>)
+            </h5>
+            <button
+              class="btn btn-outline-primary btn-sm"
+              onclick="exportDespesasToPdf()"
+            >
+              <i class="fas fa-file-pdf"></i> PDF com Cartões
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Cartão/Tipo</th>
+                  <th>Descrição</th>
+                  <th class="text-right">Valor</th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="listaDespesas"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card custom-card mt-3">
+        <div class="card-body text-center">
+          <h4>
+            Total Filtrado:
+            <span id="totalDespesas" class="text-primary">R$ 0,00</span>
+          </h4>
+        </div>
+      </div>
+    </div>
+
+    <div id="undoPanel"></div>
+    <div
+      class="modal fade"
+      id="modalRegistraDespesa"
+      tabindex="-1"
+      role="dialog"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header" id="modal_titulo_div">
+            <h5 class="modal-title" id="modal_titulo"></h5>
+            <button class="close" data-dismiss="modal">&times;</button>
+          </div>
+          <div class="modal-body" id="modal_conteudo"></div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-dismiss="modal">
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="site-footer mt-5">
+      <div class="container">
+        <div class="footer-center">
+          &copy; <span id="currentYear"></span> - Desenvolvido por Paes_Tech Sistemas
+        </div>
+      </div>
+    </footer>
+
+    <button id="themeToggle" aria-label="Alternar tema">🌙</button>
+    <script>
+      (function () {
+        const root = document.documentElement;
+        const toggle = document.getElementById("themeToggle");
+        const saved = localStorage.getItem("theme") || "light";
+        if (saved === "dark") root.setAttribute("data-theme", "dark");
+
+        toggle.addEventListener("click", () => {
+          const isDark = root.getAttribute("data-theme") === "dark";
+          if (isDark) {
+            root.removeAttribute("data-theme");
+            localStorage.setItem("theme", "light");
+          } else {
+            root.setAttribute("data-theme", "dark");
+            localStorage.setItem("theme", "dark");
+          }
+        });
+      })();
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <script src="app.js"></script>
+    <script>
+      document.getElementById("currentYear").textContent =
+        new Date().getFullYear();
+      document.addEventListener("DOMContentLoaded", () =>
+        carregaListaDespesas()
+      );
+
+      function limparTudo() {
+        document.getElementById("ano").value = "";
+        document.getElementById("mes").value = "";
+        document.getElementById("tipo").value = "";
+        document.getElementById("descricao").value = "";
+        carregaListaDespesas();
+      }
+
+      // Override para atualizar totais
+      const originalCarrega = carregaListaDespesas;
+      carregaListaDespesas = function (d = [], f = false) {
+        if (d.length === 0 && f === false) d = bd.recuperarTodosRegistros();
+        originalCarrega(d, f);
+
+        const total = d.reduce(
+          (sum, item) => sum + (parseFloat(item.valor) || 0),
+          0
+        );
+        document.getElementById("totalRegistros").textContent = d.length;
+        document.getElementById("totalDespesas").textContent = `R$ ${total
+          .toFixed(2)
+          .replace(".", ",")}`;
+      };
+    </script>
+  </body>
+</html>

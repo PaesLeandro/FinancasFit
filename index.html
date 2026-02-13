@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orçamento Pessoal - Cadastro</title>
+
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+      crossorigin="anonymous"
+    />
+
+    <link rel="stylesheet" href="css/custom.css" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+
+    <script
+      defer
+      src="https://use.fontawesome.com/releases/v5.0.8/js/all.js"
+    ></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <meta name="theme-color" content="#ffffff" />
+  </head>
+
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-5">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">
+          <span class="ml-2">💰 Orçamento Pessoal</span>
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-toggle="collapse"
+          data-target="#navbarNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item active">
+              <a class="nav-link" href="index.html"
+                ><i class="fas fa-plus-circle"></i> Cadastro</a
+              >
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="consulta.html"
+                ><i class="fas fa-search"></i> Consulta</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="page-header mb-4">
+        <h1>📝 Registro de Despesas</h1>
+        <p class="small-muted">
+          Cadastre suas despesas e controle seus cartões
+        </p>
+      </div>
+
+      <div class="row">
+        <div class="col-lg-6 mb-4">
+          <div class="card custom-card">
+            <div class="card-body">
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <div>
+                  <h5 class="card-title">💳 Cartões de Crédito</h5>
+                  <p class="section-subtle mb-0">Gerencie seus cartões</p>
+                </div>
+                <button
+                  class="btn btn-outline-primary btn-sm"
+                  data-toggle="modal"
+                  data-target="#modalGerenciarCartoes"
+                >
+                  <i class="fas fa-cog"></i> Gerenciar
+                </button>
+              </div>
+              <div class="alert alert-info alert-sm mb-0">
+                <i class="fas fa-info-circle"></i>
+                <strong>Dica:</strong> Cadastre cartões para o sistema calcular
+                o vencimento automaticamente.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+          <div class="card custom-card">
+            <div class="card-body">
+              <h5 class="card-title">➕ Nova Despesa</h5>
+              <p class="section-subtle">
+                Lance uma compra à vista ou parcelada
+              </p>
+
+              <button
+                class="btn btn-primary btn-block mt-3"
+                data-toggle="modal"
+                data-target="#modalCadastrarDespesa"
+              >
+                <i class="fas fa-plus-circle"></i> Lançar Despesa
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card custom-card">
+            <div class="card-body">
+              <h5 class="card-title">📊 Resumo Geral</h5>
+
+              <div id="resumoDespesas" class="mt-3">
+                <p class="text-muted">Carregando dados...</p>
+              </div>
+
+              <div class="row mt-4 justify-content-center">
+                <div class="col-md-8 col-lg-6">
+                  <canvas id="graficoDespesas"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Gerenciar Cartões -->
+    <div
+      class="modal fade"
+      id="modalGerenciarCartoes"
+      tabindex="-1"
+      role="dialog"
+    >
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">💳 Gerenciar Cartões de Crédito</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <!-- Formulário de Cadastro -->
+            <div class="mb-4 p-3 border rounded">
+              <h6 class="mb-3">
+                <i class="fas fa-plus"></i> Cadastrar Novo Cartão
+              </h6>
+              <div class="form-row">
+                <div class="col-md-6 mb-3">
+                  <label>Nome do Cartão</label>
+                  <input
+                    id="nomeCartao"
+                    class="form-control"
+                    placeholder="Ex: Nubank"
+                    type="text"
+                  />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label>Bandeira</label>
+                  <select id="bandeiraCartao" class="form-control">
+                    <option value="">Selecione</option>
+                    <option value="Visa">Visa</option>
+                    <option value="Mastercard">Mastercard</option>
+                    <option value="Elo">Elo</option>
+                    <option value="Amex">American Express</option>
+                    <option value="Hipercard">Hipercard</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="col-md-6 mb-3">
+                  <label>Dia do Vencimento</label>
+                  <input
+                    id="vencimentoCartao"
+                    class="form-control"
+                    type="number"
+                    min="1"
+                    max="31"
+                    placeholder="Ex: 15"
+                  />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label>Dia do Fechamento</label>
+                  <input
+                    id="fechamentoCartao"
+                    class="form-control"
+                    type="number"
+                    min="1"
+                    max="31"
+                    placeholder="Ex: 10"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                id="btnCadastrarCartao"
+                class="btn btn-success btn-block"
+              >
+                <i class="fas fa-plus-circle"></i> Adicionar Cartão
+              </button>
+            </div>
+
+            <!-- Lista de Cartões -->
+            <div>
+              <h6 class="mb-3">
+                <i class="fas fa-credit-card"></i> Cartões Cadastrados
+              </h6>
+              <div id="listaCartoes">
+                <p class="text-muted">Nenhum cartão cadastrado ainda.</p>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Cadastrar Despesa -->
+    <div
+      class="modal fade"
+      id="modalCadastrarDespesa"
+      tabindex="-1"
+      role="dialog"
+    >
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">➕ Lançar Despesa</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="modalData">Data da Compra</label>
+              <input type="date" class="form-control" id="modalData" required />
+            </div>
+
+            <div class="form-group">
+              <label for="modalTipo">Categoria</label>
+              <select class="form-control" id="modalTipo">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="modalDescricao">Descrição</label>
+              <input
+                id="modalDescricao"
+                class="form-control"
+                placeholder="Ex: Supermercado"
+              />
+            </div>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="modalValor">Valor Total (R$)</label>
+                  <input
+                    id="modalValor"
+                    class="form-control"
+                    type="text"
+                    placeholder="0,00"
+                  />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="modalCartaoVinculado">Forma de Pagto.</label>
+                  <select class="form-control" id="modalCartaoVinculado">
+                    <option value="">Débito / Dinheiro</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <hr />
+            <div class="form-check mb-2">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="checkParcelado"
+                onchange="toggleParcelas()"
+              />
+              <label class="form-check-label" for="checkParcelado"
+                >Compra Parcelada?</label
+              >
+            </div>
+
+            <div class="form-group" id="divParcelas" style="display: none">
+              <label>Quantidade de Parcelas</label>
+              <input
+                type="number"
+                class="form-control"
+                id="modalQtdParcelas"
+                min="2"
+                max="48"
+                value="2"
+              />
+              <small class="text-muted"
+                >O sistema criará lançamentos futuros automaticamente.</small
+              >
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="cadastrarDespesa()"
+            >
+              <i class="fas fa-check"></i> Cadastrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Feedback -->
+    <div
+      class="modal fade"
+      id="modalRegistraDespesa"
+      tabindex="-1"
+      role="dialog"
+    >
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div id="modal_titulo_div" class="modal-header">
+            <h5 class="modal-title" id="modal_titulo"></h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body" id="modal_conteudo"></div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="undoPanel"></div>
+
+    <footer class="site-footer mt-5">
+      <div class="container">
+        <div class="footer-center">
+          &copy; <span id="currentYear"></span> - Desenvolvido por Paes_Tech
+          Sistemas
+        </div>
+      </div>
+    </footer>
+
+    <button id="themeToggle" aria-label="Alternar tema">🌙</button>
+    <script>
+      (function () {
+        const root = document.documentElement;
+        const toggle = document.getElementById("themeToggle");
+        const saved = localStorage.getItem("theme") || "light";
+        if (saved === "dark") root.setAttribute("data-theme", "dark");
+
+        toggle.addEventListener("click", () => {
+          const isDark = root.getAttribute("data-theme") === "dark";
+          if (isDark) {
+            root.removeAttribute("data-theme");
+            localStorage.setItem("theme", "light");
+          } else {
+            root.setAttribute("data-theme", "dark");
+            localStorage.setItem("theme", "dark");
+          }
+        });
+      })();
+    </script>
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <script src="app.js"></script>
+    <script>
+      document.getElementById("currentYear").textContent =
+        new Date().getFullYear();
+    </script>
+  </body>
+</html>
