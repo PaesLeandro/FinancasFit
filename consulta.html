@@ -17,6 +17,7 @@
     />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
@@ -139,18 +140,35 @@
             <h5 class="mb-2 mb-md-0">
               Resultados (<span id="totalRegistros">0</span>)
             </h5>
-            <button
-              class="btn btn-outline-primary btn-sm"
-              onclick="exportDespesasToPdf()"
-            >
-              <i class="fas fa-file-pdf"></i> PDF com Cartões
-            </button>
+            <div>
+              <button
+                class="btn btn-outline-danger btn-sm mr-2"
+                id="btnExcluirSelecionados"
+                onclick="excluirDespesasSelecionadas()"
+                style="display: none"
+              >
+                <i class="fas fa-trash"></i> Excluir Selecionados
+              </button>
+              <button
+                class="btn btn-outline-primary btn-sm"
+                onclick="exportDespesasToPdf()"
+              >
+                <i class="fas fa-file-pdf"></i> PDF com Cartões
+              </button>
+            </div>
           </div>
 
           <div class="table-responsive">
             <table class="table table-hover mb-0">
               <thead>
                 <tr>
+                  <th width="40">
+                    <input
+                      type="checkbox"
+                      id="checkAll"
+                      onchange="toggleTodos()"
+                    />
+                  </th>
                   <th>Vencimento</th>
                   <th>Cartão/Tipo</th>
                   <th>Descrição</th>
@@ -170,6 +188,49 @@
             Total Filtrado:
             <span id="totalDespesas" class="text-primary">R$ 0,00</span>
           </h4>
+        </div>
+      </div>
+
+      <div class="card custom-card mt-3">
+        <div class="card-body">
+          <h5 class="card-title">📄 Importar Fatura PDF</h5>
+          <p class="section-subtle">
+            Envie a fatura do cartão em PDF para cadastrar despesas
+            automaticamente
+          </p>
+
+          <div class="form-group">
+            <label for="pdfCartaoImport">Selecionar Cartão (opcional)</label>
+            <select class="form-control" id="pdfCartaoImport">
+              <option value="">Nenhum (Débito/Dinheiro)</option>
+            </select>
+            <small class="text-muted"
+              >Vincule as despesas do PDF a um cartão cadastrado</small
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="inputPdfFatura">Selecionar Arquivo PDF</label>
+            <input
+              type="file"
+              class="form-control-file"
+              id="inputPdfFatura"
+              accept=".pdf,application/pdf"
+            />
+            <small class="text-muted"
+              >Formato esperado: DD/MM/AAAA Descrição R$ valor</small
+            >
+          </div>
+
+          <button class="btn btn-primary" id="btnImportarPdf">
+            <i class="fas fa-file-import"></i> Importar Despesas
+          </button>
+
+          <div id="pdfImportStatus" class="mt-3" style="display: none">
+            <div class="alert alert-info">
+              <span id="pdfImportMessage"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -234,9 +295,6 @@
     <script>
       document.getElementById("currentYear").textContent =
         new Date().getFullYear();
-      document.addEventListener("DOMContentLoaded", () =>
-        carregaListaDespesas(),
-      );
 
       function limparTudo() {
         document.getElementById("ano").value = "";
@@ -257,10 +315,44 @@
           0,
         );
         document.getElementById("totalRegistros").textContent = d.length;
-        document.getElementById("totalDespesas").textContent = `R$ ${total
+
+        // Formatar valor com separador de milhar
+        const totalFormatado = total
           .toFixed(2)
-          .replace(".", ",")}`;
+          .replace(".", ",")
+          .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        document.getElementById("totalDespesas").textContent =
+          `R$ ${totalFormatado}`;
       };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        console.log("DOM carregado em consulta.html");
+
+        preencherCategorias();
+        carregaListaDespesas();
+        carregarCartoesNoPdfImport();
+
+        // Import PDF button
+        const btnImportarPdf = document.getElementById("btnImportarPdf");
+        console.log("Botão importar PDF:", btnImportarPdf);
+
+        if (btnImportarPdf) {
+          btnImportarPdf.addEventListener("click", () => {
+            console.log("Botão clicado!");
+            importarDespesasDePdf();
+          });
+        }
+
+        // Custom file input label
+        const inputPdf = document.getElementById("inputPdfFatura");
+        console.log("Input PDF:", inputPdf);
+
+        if (inputPdf) {
+          inputPdf.addEventListener("change", function () {
+            console.log("Arquivo selecionado:", this.files[0]);
+          });
+        }
+      });
     </script>
   </body>
 </html>

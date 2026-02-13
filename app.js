@@ -49,7 +49,10 @@ class Bd {
     let lista = this.recuperarTodosRegistros();
 
     if (despesa.ano) lista = lista.filter(d => d.ano === despesa.ano);
-    if (despesa.mes) lista = lista.filter(d => d.mes === despesa.mes);
+    if (despesa.mes) {
+      const mesPadded = String(despesa.mes).padStart(2, "0");
+      lista = lista.filter(d => d.mes === mesPadded);
+    }
     if (despesa.tipo) lista = lista.filter(d => d.tipo === despesa.tipo);
     if (despesa.descricao) {
       lista = lista.filter(d =>
@@ -88,7 +91,9 @@ const categorias = [
 function preencherCategorias() {
   const selects = document.querySelectorAll("#tipo, #modalTipo");
   selects.forEach(select => {
-    select.innerHTML = '<option value="">Selecione</option>';
+    const isFilter = select.id === "tipo";
+    const defaultText = isFilter ? "Todas as categorias" : "Selecione";
+    select.innerHTML = `<option value="">${defaultText}</option>`;
     categorias.forEach(cat => {
       select.innerHTML += `<option value="${cat.id}">${cat.nome}</option>`;
     });
@@ -197,6 +202,7 @@ function editarCartao(idx) {
   saveCartoes(cartoes);
   atualizarListaCartoes();
   carregarCartoesNoSelect();
+  carregarCartoesNoPdfImport();
   exibirMensagem("✅ Cartão alterado com sucesso!", "Sucesso", "success");
 }
 
@@ -213,6 +219,7 @@ function excluirCartao(idx) {
   saveCartoes(cartoes);
   atualizarListaCartoes();
   carregarCartoesNoSelect();
+  carregarCartoesNoPdfImport();
   exibirMensagem("✅ Cartão excluído com sucesso!", "Sucesso", "success");
 }
 
@@ -245,6 +252,7 @@ if (document.getElementById("btnCadastrarCartao")) {
 
     atualizarListaCartoes();
     carregarCartoesNoSelect();
+    carregarCartoesNoPdfImport();
     exibirMensagem("✅ Cartão cadastrado com sucesso!", "Sucesso", "success");
   });
 }
@@ -386,6 +394,9 @@ function carregaListaDespesas(despesas = [], filtro = false) {
 
     const linha = `
       <tr class="fade-in-row">
+        <td>
+          <input type="checkbox" class="checkDespesa" value="${idx}" onchange="atualizarBotaoExcluir()" />
+        </td>
         <td>${dataVenc}</td>
         <td>${d.cartao || getNomeCategoria(d.tipo)}</td>
         <td>${d.descricao}</td>
@@ -399,6 +410,11 @@ function carregaListaDespesas(despesas = [], filtro = false) {
     `;
     lista.innerHTML += linha;
   });
+  
+  // Resetar checkbox de selecionar todos
+  const checkAll = document.getElementById("checkAll");
+  if (checkAll) checkAll.checked = false;
+  atualizarBotaoExcluir();
 }
 
 // ==========================================
@@ -434,6 +450,45 @@ function removerDespesa(idx) {
   if (typeof atualizarResumoDespesas === "function") {
     atualizarResumoDespesas();
   }
+}
+
+// ==========================================
+// SELEÇÃO MÚLTIPLA
+// ==========================================
+function toggleTodos() {
+  const checkAll = document.getElementById("checkAll");
+  const checkboxes = document.querySelectorAll(".checkDespesa");
+  checkboxes.forEach(cb => cb.checked = checkAll.checked);
+  atualizarBotaoExcluir();
+}
+
+function atualizarBotaoExcluir() {
+  const checkboxes = document.querySelectorAll(".checkDespesa:checked");
+  const btn = document.getElementById("btnExcluirSelecionados");
+  if (btn) {
+    btn.style.display = checkboxes.length > 0 ? "inline-block" : "none";
+  }
+}
+
+function excluirDespesasSelecionadas() {
+  const checkboxes = document.querySelectorAll(".checkDespesa:checked");
+  const indices = Array.from(checkboxes).map(cb => parseInt(cb.value));
+  
+  if (indices.length === 0) return;
+  
+  if (!confirm(`Deseja excluir ${indices.length} despesa(s) selecionada(s)?`)) return;
+  
+  // Ordenar do maior para o menor para não afetar os índices
+  indices.sort((a, b) => b - a);
+  
+  indices.forEach(idx => bd.remover(idx));
+  
+  carregaListaDespesas();
+  if (typeof atualizarResumoDespesas === "function") {
+    atualizarResumoDespesas();
+  }
+  
+  alert(`✅ ${indices.length} despesa(s) excluída(s) com sucesso!`);
 }
 
 function mostrarUndo() {
@@ -655,12 +710,300 @@ function exportDespesasToPdf() {
 }
 
 // ==========================================
+// IMPORTAR DESPESAS DE PDF
+// ==========================================
+async function importarDespesasDePdf() {
+  console.log("Iniciando importacao de PDF...");
+  
+  const input = document.getElementById("inputPdfFatura");
+  const cartaoIdx = document.getElementById("pdfCartaoImport").value;
+  const statusDiv = document.getElementById("pdfImportStatus");
+  const messageSpan = document.getElementById("pdfImportMessage");
+
+  console.log("Elementos encontrados:", { input, statusDiv, messageSpan });
+
+  if (!input || !input.files || input.files.length === 0) {
+    alert("⚠️ Selecione um arquivo PDF!");
+    return;
+  }
+
+  const file = input.files[0];
+  console.log("Arquivo selecionado:", file.name);
+  
+  if (typeof window.pdfjsLib === "undefined") {
+    alert("⚠️ Biblioteca PDF não carregada. Recarregue a página.");
+    console.error("PDF.js não está disponível");
+    return;
+  }
+
+  console.log("PDF.js carregado:", window.pdfjsLib);
+
+  if (statusDiv) statusDiv.style.display = "block";
+  if (messageSpan) messageSpan.textContent = "📄 Processando PDF...";
+
+  try {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    
+    console.log("Worker configurado");
+
+    const arrayBuffer = await file.arrayBuffer();
+    console.log("ArrayBuffer criado, tamanho:", arrayBuffer.byteLength);
+    
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    console.log("PDF carregado, páginas:", pdf.numPages);
+
+    const despesasEncontradas = [];
+    const despesasProcessadas = new Set(); // Para evitar duplicatas
+    const cartoes = getCartoes();
+    const cartaoSelecionado = cartaoIdx !== "" ? cartoes[parseInt(cartaoIdx)] : null;
+
+    console.log("Cartão selecionado:", cartaoSelecionado);
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      console.log(`\n========== PÁGINA ${pageNum} ==========`);
+      
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const texto = textContent.items.map(item => item.str).join(" ");
+
+      console.log(`TEXTO COMPLETO da página ${pageNum}:\n`, texto);
+      console.log(`\n========== FIM TEXTO ==========\n`);
+
+      // Tenta múltiplos padrões para maior compatibilidade
+      // Padrão 1: DD/MM Descrição Cidade Valor,XX (com suporte a separador de milhar: 1.150,23)
+      // Padrão 2: DD/MM Descrição Parcela X de Y ... Valor,XX
+      const padrao1 = /(\d{2}\/\d{2})\s+(.+?)\s+([A-Z\s]+)\s+(\d+(?:\.\d{3})*,\d{2})/gi;
+      const padrao2 = /(\d{2}\/\d{2})\s+(.+?)\s+[Pp]arcela\s+\d+\s+de\s+\d+\s+(.+?)\s+(\d+(?:\.\d{3})*,\d{2})/gi;
+      
+      let matches = [];
+      let match;
+      
+      // Tenta primeiro padrão
+      while ((match = padrao1.exec(texto)) !== null) {
+        matches.push({
+          data: match[1],
+          desc: match[2].trim(),
+          cidade: match[3].trim(),
+          valor: match[4],
+          tipo: 'normal'
+        });
+      }
+      
+      // Tenta segundo padrão (com Parcela)
+      while ((match = padrao2.exec(texto)) !== null) {
+        matches.push({
+          data: match[1],
+          desc: match[2].trim(),
+          cidade: match[3].trim(),
+          valor: match[4],
+          tipo: 'parcela'
+        });
+      }
+      
+      let matchCount = 0;
+      for (const m of matches) {
+        matchCount++;
+        const dataStr = m.data;
+        let descricao = m.desc;
+        const cidade = m.cidade;
+        const valorStr = m.valor;
+
+        console.log(`\n✓ Match ${matchCount}:`, { 
+          data: dataStr, 
+          descricao: descricao.substring(0, 50),
+          cidade: cidade.substring(0, 30),
+          valor: valorStr 
+        });
+
+        // Criar chave única MAIS ROBUSTA (normalizar espaços, remover caracteres especiais)
+        const descricaoNormalizada = descricao.replace(/\s+/g, ' ').trim().toLowerCase();
+        const cidadeNormalizada = cidade.replace(/\s+/g, ' ').trim().toLowerCase();
+        const chaveUnicaBruta = `${dataStr}|${descricaoNormalizada.substring(0, 40)}|${cidadeNormalizada.substring(0, 20)}|${valorStr}`;
+        
+        if (despesasProcessadas.has(chaveUnicaBruta)) {
+          console.log("  ✗ Despesa duplicada (já capturada), ignorando");
+          continue;
+        }
+        
+        despesasProcessadas.add(chaveUnicaBruta);
+
+        // Filtrar linhas indesejadas (incluindo variações de "total")
+        const descricaoLower = descricao.toLowerCase();
+        const cidadeLower = cidade.toLowerCase();
+        const textoCompleto = (descricaoLower + " " + cidadeLower).toLowerCase();
+        
+        const palavrasIgnorar = [
+          "total para", 
+          "total da fatura", 
+          "fatura em real",
+          "previsão de fechamento", 
+          "limite de compras", 
+          "saldo devedor",
+          "valor total",
+          "total em real"
+        ];
+        
+        const deveIgnorar = palavrasIgnorar.some(palavra => textoCompleto.includes(palavra));
+        
+        if (deveIgnorar || descricao.length < 3) {
+          console.log("  ✗ Ignorado (palavra-chave de metadados)");
+          continue;
+        }
+
+        // Parse data - inferir ano baseado no mês da compra e mês atual
+        const dataAtual = new Date();
+        const anoAtual = dataAtual.getFullYear();
+        const mesAtual = dataAtual.getMonth() + 1; // 0-11 para 1-12
+        
+        const [dia, mes] = dataStr.split("/");
+        const mesCompra = parseInt(mes);
+        
+        // Se a compra é de um mês futuro (ex: compra em agosto mas estamos em fevereiro),
+        // assume que é do ano anterior
+        let anoCompra = anoAtual;
+        if (mesCompra > mesAtual + 1) { // +1 de margem
+          anoCompra = anoAtual - 1;
+          console.log(`  → Mês da compra (${mesCompra}) é futuro, usando ano anterior: ${anoCompra}`);
+        }
+        
+        if (!dia || !mes) {
+          console.log("  ✗ Data inválida");
+          continue;
+        }
+
+        // Combinar descrição com cidade
+        descricao = `${descricao.substring(0, 50)} - ${cidade.substring(0, 20)}`.trim();
+
+        // Parse valor - formato brasileiro XX,XX ou 1.150,23 (com separador de milhar)
+        // Primeiro remove ponto de milhar, depois converte vírgula em ponto
+        const valorLimpo = valorStr.replace(".", "").replace(",", ".");
+        const valor = parseFloat(valorLimpo);
+        
+        console.log(`  → Valor parseado: ${valor}`);
+        
+        if (isNaN(valor) || valor <= 0) {
+          console.log("  ✗ Valor inválido");
+          continue;
+        }
+        
+        if (valor > 5000) {
+          console.log(`  ✗ Valor muito alto (${valor}), provavelmente é total da fatura. Pulando...`);
+          continue;
+        }
+
+        // Calcular vencimento se houver cartão
+        let dataVenc;
+        if (cartaoSelecionado) {
+          const dataCompra = `${anoCompra}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
+          dataVenc = calcularVencimento(dataCompra, cartaoSelecionado);
+        } else {
+          dataVenc = `${anoCompra}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
+        }
+
+        const [anoVenc, mesVenc, diaVenc] = dataVenc.split("-");
+
+        despesasEncontradas.push({
+          ano: anoVenc,
+          mes: mesVenc,
+          dia: diaVenc,
+          tipo: "10", // Outros
+          descricao: descricao.substring(0, 100),
+          valor: valor.toFixed(2),
+          cartao: cartaoSelecionado ? cartaoSelecionado.nome : ""
+        });
+        
+        console.log("  ✓ Despesa adicionada:", despesasEncontradas[despesasEncontradas.length - 1]);
+      }
+    } // Fecha o loop for das páginas
+
+    console.log(`\n========== RESUMO ==========`);
+    console.log(`Total de despesas encontradas: ${despesasEncontradas.length}`);
+
+    if (despesasEncontradas.length === 0) {
+      if (messageSpan) {
+        messageSpan.innerHTML = `⚠️ Nenhuma despesa encontrada no PDF.<br><small>Verifique o console (F12) para ver o texto extraído e envie para análise.</small>`;
+      }
+      console.warn("❌ NENHUMA DESPESA ENCONTRADA!");
+      console.warn("Por favor, copie o 'TEXTO COMPLETO' acima e envie para ajustarmos a regex.");
+      setTimeout(() => { if (statusDiv) statusDiv.style.display = "none"; }, 8000);
+      return;
+    }
+
+    // Verificar duplicatas com despesas já existentes no localStorage
+    const despesasExistentes = bd.recuperarTodosRegistros();
+    const despesasNovas = [];
+    let duplicatasIgnoradas = 0;
+    
+    despesasEncontradas.forEach(nova => {
+      const isDuplicata = despesasExistentes.some(existente => {
+        return existente.ano === nova.ano &&
+               existente.mes === nova.mes &&
+               existente.dia === nova.dia &&
+               existente.descricao.toLowerCase().trim() === nova.descricao.toLowerCase().trim() &&
+               parseFloat(existente.valor) === parseFloat(nova.valor);
+      });
+      
+      if (isDuplicata) {
+        console.log("  ✗ Despesa já existe no banco, ignorando:", nova);
+        duplicatasIgnoradas++;
+      } else {
+        despesasNovas.push(nova);
+      }
+    });
+
+    console.log(`Despesas novas: ${despesasNovas.length}, Duplicatas ignoradas: ${duplicatasIgnoradas}`);
+
+    // Gravar apenas despesas novas
+    console.log("Gravando despesas novas...");
+    despesasNovas.forEach(d => bd.gravar(d));
+
+    if (messageSpan) {
+      if (despesasNovas.length > 0) {
+        messageSpan.textContent = `✅ ${despesasNovas.length} despesa(s) importada(s) com sucesso!${duplicatasIgnoradas > 0 ? ` (${duplicatasIgnoradas} duplicata(s) ignorada(s))` : ''}`;
+      } else {
+        messageSpan.innerHTML = `⚠️ Todas as despesas já foram importadas anteriormente.<br><small>${duplicatasIgnoradas} duplicata(s) ignorada(s).</small>`;
+      }
+    }
+    input.value = "";
+
+    if (typeof atualizarResumoDespesas === "function") {
+      atualizarResumoDespesas();
+    }
+
+    if (typeof carregaListaDespesas === "function") {
+      carregaListaDespesas();
+    }
+
+    setTimeout(() => { if (statusDiv) statusDiv.style.display = "none"; }, 5000);
+
+  } catch (error) {
+    console.error("Erro ao processar PDF:", error);
+    console.error("Stack:", error.stack);
+    if (messageSpan) messageSpan.textContent = `❌ Erro: ${error.message}`;
+    setTimeout(() => { if (statusDiv) statusDiv.style.display = "none"; }, 5000);
+  }
+}
+
+function carregarCartoesNoPdfImport() {
+  const select = document.getElementById("pdfCartaoImport");
+  if (!select) return;
+
+  select.innerHTML = '<option value="">Nenhum (Débito/Dinheiro)</option>';
+  const cartoes = getCartoes();
+  cartoes.forEach((c, idx) => {
+    select.innerHTML += `<option value="${idx}">${c.nome} - ${c.bandeira}</option>`;
+  });
+}
+
+// ==========================================
 // INICIALIZAÇÃO
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
   preencherCategorias();
   carregarCartoesNoSelect();
   atualizarListaCartoes();
+  carregarCartoesNoPdfImport();
 
   if (typeof atualizarResumoDespesas === "function") {
     atualizarResumoDespesas();
@@ -671,5 +1014,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if (inputData) {
     const hoje = new Date().toISOString().split("T")[0];
     inputData.value = hoje;
+  }
+
+  // Import PDF button
+  const btnImportarPdf = document.getElementById("btnImportarPdf");
+  if (btnImportarPdf) {
+    btnImportarPdf.addEventListener("click", importarDespesasDePdf);
+  }
+
+  // Custom file input label
+  const inputPdf = document.getElementById("inputPdfFatura");
+  if (inputPdf) {
+    inputPdf.addEventListener("change", function() {
+      const fileName = this.files[0] ? this.files[0].name : "Escolher arquivo PDF...";
+      const label = this.nextElementSibling;
+      if (label) label.textContent = fileName;
+    });
   }
 });

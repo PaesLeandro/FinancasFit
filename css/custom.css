@@ -118,6 +118,21 @@ body {
   color: #2c5282;
 }
 
+/* Custom File Input */
+.custom-file-input {
+  cursor: pointer;
+}
+
+.custom-file-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-file-label::after {
+  content: "Procurar";
+}
+
 /* Buttons */
 .btn {
   border-radius: 10px;
