@@ -864,105 +864,6 @@ function exportDespesasToCsv() {
   URL.revokeObjectURL(url);
 }
 
-async function importarDespesasDeCsv() {
-  const input = document.getElementById("inputCsvImport");
-  if (!input || !input.files || input.files.length === 0) {
-    alert("⚠️ Selecione um arquivo CSV!");
-    return;
-  }
-
-  const file = input.files[0];
-  const text = await file.text();
-  const rows = parseCsvText(text);
-
-  if (rows.length === 0) {
-    alert("⚠️ CSV vazio ou inválido.");
-    return;
-  }
-
-  const header = rows[0].map(h => h.trim().toLowerCase());
-  const hasHeader = header.includes("ano") && header.includes("mes") && header.includes("dia");
-
-  const idx = hasHeader
-    ? {
-        ano: header.indexOf("ano"),
-        mes: header.indexOf("mes"),
-        dia: header.indexOf("dia"),
-        tipo: header.indexOf("tipo"),
-        descricao: header.indexOf("descricao"),
-        valor: header.indexOf("valor"),
-        cartao: header.indexOf("cartao")
-      }
-    : { ano: 0, mes: 1, dia: 2, tipo: 3, descricao: 4, valor: 5, cartao: 6 };
-
-  const startRow = hasHeader ? 1 : 0;
-  const existentes = bd.recuperarTodosRegistros();
-  const existentesSet = new Set(
-    existentes.map(e => `${e.ano}|${e.mes}|${e.dia}|${e.descricao.toLowerCase().trim()}|${parseFloat(e.valor).toFixed(2)}`)
-  );
-
-  let adicionadas = 0;
-  let ignoradas = 0;
-
-  for (let i = startRow; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length < 6) continue;
-
-    let ano = (row[idx.ano] || "").trim();
-    let mes = (row[idx.mes] || "").trim();
-    let dia = (row[idx.dia] || "").trim();
-    const tipo = (row[idx.tipo] || "10").trim() || "10";
-    const descricao = (row[idx.descricao] || "").trim();
-    const valorStr = (row[idx.valor] || "").trim();
-    const cartao = (row[idx.cartao] || "").trim();
-
-    if (!ano || !mes || !dia || descricao.length < 3) {
-      ignoradas++;
-      continue;
-    }
-
-    mes = String(mes).padStart(2, "0");
-    dia = String(dia).padStart(2, "0");
-
-    const valor = parseValorInput(valorStr);
-    if (isNaN(valor) || valor <= 0) {
-      ignoradas++;
-      continue;
-    }
-
-    const chave = `${ano}|${mes}|${dia}|${descricao.toLowerCase().trim()}|${valor.toFixed(2)}`;
-    if (existentesSet.has(chave)) {
-      ignoradas++;
-      continue;
-    }
-
-    bd.gravar({
-      ano,
-      mes,
-      dia,
-      tipo,
-      descricao,
-      valor: valor.toFixed(2),
-      cartao
-    });
-
-    existentesSet.add(chave);
-    adicionadas++;
-  }
-
-  input.value = "";
-
-  if (typeof atualizarResumoDespesas === "function") {
-    atualizarResumoDespesas();
-  }
-
-  if (typeof carregaListaDespesas === "function") {
-    carregaListaDespesas();
-  }
-
-  alert(`✅ CSV importado: ${adicionadas} nova(s), ${ignoradas} ignorada(s).`);
-}
-
 // ==========================================
 // IMPORTAR DESPESAS DE PDF
 // ==========================================
@@ -1311,15 +1212,16 @@ document.addEventListener("DOMContentLoaded", () => {
     btnImportarPdf.addEventListener("click", importarDespesasDePdf);
   }
 
-  // Export/Import CSV buttons
+  // Export CSV button
   const btnExportCsv = document.getElementById("btnExportCsv");
   if (btnExportCsv) {
     btnExportCsv.addEventListener("click", exportDespesasToCsv);
   }
 
-  const btnImportarCsv = document.getElementById("btnImportarCsv");
-  if (btnImportarCsv) {
-    btnImportarCsv.addEventListener("click", importarDespesasDeCsv);
+  // Export PDF button
+  const btnExportPdf = document.getElementById("btnExportPdf");
+  if (btnExportPdf) {
+    btnExportPdf.addEventListener("click", exportDespesasToPdf);
   }
 
   // Custom file input label
