@@ -18,6 +18,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
@@ -262,7 +263,7 @@
       <div class="container">
         <div class="footer-center">
           &copy; <span id="currentYear"></span> - Desenvolvido por Paes_Tech
-          Sistemas
+          Sistemas. Todos os direitos reservados.
         </div>
       </div>
     </footer>
@@ -316,8 +317,23 @@
         );
         document.getElementById("totalRegistros").textContent = d.length;
 
+        const filtrosAtivos =
+          document.getElementById("ano").value ||
+          document.getElementById("mes").value ||
+          document.getElementById("tipo").value ||
+          document.getElementById("descricao").value;
+
+        let totalFinal = total;
+        if (!filtrosAtivos) {
+          const totalFaturaStr = localStorage.getItem("totalFaturaImportada");
+          const totalFatura = totalFaturaStr ? parseFloat(totalFaturaStr) : NaN;
+          if (!isNaN(totalFatura) && totalFatura > 0) {
+            totalFinal = totalFatura;
+          }
+        }
+
         // Formatar valor com separador de milhar
-        const totalFormatado = total
+        const totalFormatado = totalFinal
           .toFixed(2)
           .replace(".", ",")
           .replace(/\B(?=(\d{3})+(?!\d))/g, ".");

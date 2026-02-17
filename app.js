@@ -234,15 +234,16 @@ function calcularVencimento(dataCompra, cartao) {
   let anoVenc = ano;
 
   if (dia <= cartao.fechamento) {
-    // Compra dentro do ciclo atual
-    mesVenc = mes;
-  } else {
-    // Compra após fechamento - vai para próximo mês
+    // Compra dentro do ciclo atual: vence no mês seguinte
     mesVenc = mes + 1;
-    if (mesVenc > 12) {
-      mesVenc = 1;
-      anoVenc++;
-    }
+  } else {
+    // Compra após fechamento: vence no mês seguinte ao próximo
+    mesVenc = mes + 2;
+  }
+
+  while (mesVenc > 12) {
+    mesVenc -= 12;
+    anoVenc++;
   }
 
   return `${anoVenc}-${String(mesVenc).padStart(2, "0")}-${String(cartao.vencimento).padStart(2, "0")}`;
