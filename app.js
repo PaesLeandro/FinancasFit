@@ -257,6 +257,11 @@ function toggleParcelas() {
   document.getElementById("divParcelas").style.display = checked ? "block" : "none";
 }
 
+function parseValorInput(valorStr) {
+  const limpo = valorStr.replace(/\./g, "").replace(",", ".");
+  return parseFloat(limpo);
+}
+
 // ==========================================
 // CADASTRAR DESPESA
 // ==========================================
@@ -264,11 +269,11 @@ function cadastrarDespesa() {
   const data = document.getElementById("modalData").value;
   const tipo = document.getElementById("modalTipo").value;
   const descricao = document.getElementById("modalDescricao").value.trim();
-  const valorStr = document.getElementById("modalValor").value.replace(",", ".");
-  const valor = parseFloat(valorStr);
+  const valorStr = document.getElementById("modalValor").value.trim();
+  const valor = parseValorInput(valorStr);
   const cartaoIdx = document.getElementById("modalCartaoVinculado").value;
 
-  if (!data || !tipo || !descricao || isNaN(valor) || valor <= 0) {
+  if (!data || !tipo || descricao.length < 3 || isNaN(valor) || valor <= 0) {
     exibirMensagem("⚠️ Preencha todos os campos corretamente!", "Erro", "danger");
     return;
   }
@@ -353,19 +358,21 @@ function carregaListaDespesas(despesas = [], filtro = false) {
   const lista = document.getElementById("listaDespesas");
   if (!lista) return;
 
+  const todosDespesas = bd.recuperarTodosRegistros();
+  const indiceMap = new Map();
+  todosDespesas.forEach((item, idx) => {
+    const key = `${item.ano}|${item.mes}|${item.dia}|${item.descricao}|${item.valor}|${item.tipo}`;
+    if (!indiceMap.has(key)) indiceMap.set(key, []);
+    indiceMap.get(key).push(idx);
+  });
+
   lista.innerHTML = "";
 
   despesas.forEach((d) => {
     // Encontrar índice real no banco de dados
-    const todosDospesas = bd.recuperarTodosRegistros();
-    const indiceReal = todosDospesas.findIndex(item =>
-      item.ano === d.ano &&
-      item.mes === d.mes &&
-      item.dia === d.dia &&
-      item.descricao === d.descricao &&
-      item.valor === d.valor &&
-      item.tipo === d.tipo
-    );
+    const key = `${d.ano}|${d.mes}|${d.dia}|${d.descricao}|${d.valor}|${d.tipo}`;
+    const indices = indiceMap.get(key) || [];
+    const indiceReal = indices.length ? indices.shift() : -1;
 
     const dataVenc = `${String(d.dia).padStart(2, "0")}/${String(d.mes).padStart(2, "0")}/${d.ano}`;
     const valorFormatado = `R$ ${parseFloat(d.valor).toFixed(2).replace(".", ",")}`;
@@ -380,6 +387,9 @@ function carregaListaDespesas(despesas = [], filtro = false) {
         <td>${d.descricao}</td>
         <td class="text-right"><strong>${valorFormatado}</strong></td>
         <td class="text-center">
+          <button class="btn btn-outline-primary btn-sm mr-1" onclick="editarValorDespesa(${indiceReal})">
+            <i class="fas fa-edit"></i>
+          </button>
           <button class="btn btn-danger btn-sm" onclick="removerDespesa(${indiceReal})">
             <i class="fas fa-trash"></i>
           </button>
@@ -437,6 +447,40 @@ function removerDespesa(idx) {
   }
 
   mostrarUndo();
+  if (typeof atualizarResumoDespesas === "function") {
+    atualizarResumoDespesas();
+  }
+}
+
+function editarValorDespesa(idx) {
+  const arr = bd.recuperarTodosRegistros();
+  const item = arr[idx];
+  if (!item) return;
+
+  const valorAtual = parseFloat(item.valor).toFixed(2).replace(".", ",");
+  const novoValorStr = prompt("Novo valor (ex: 123,45):", valorAtual);
+  if (novoValorStr === null) return;
+
+  const novoValor = parseValorInput(novoValorStr.trim());
+  if (isNaN(novoValor) || novoValor <= 0) {
+    alert("⚠️ Valor inválido!");
+    return;
+  }
+  item.valor = novoValor.toFixed(2);
+  localStorage.setItem("despesas", JSON.stringify(arr));
+
+  const ano = document.getElementById("ano")?.value || "";
+  const mes = document.getElementById("mes")?.value || "";
+  const tipo = document.getElementById("tipo")?.value || "";
+  const descricao = document.getElementById("descricao")?.value || "";
+
+  if (ano || mes || tipo || descricao) {
+    const resultado = bd.pesquisar({ ano, mes, tipo, descricao });
+    carregaListaDespesas(resultado, true);
+  } else {
+    carregaListaDespesas();
+  }
+
   if (typeof atualizarResumoDespesas === "function") {
     atualizarResumoDespesas();
   }
@@ -716,6 +760,207 @@ function exportDespesasToPdf() {
   });
 
   doc.save("orcamento-pessoal.pdf");
+}
+
+// ==========================================
+// EXPORTAR / IMPORTAR CSV
+// ==========================================
+function csvEscape(value) {
+  const str = String(value ?? "");
+  return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function parseCsvText(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < text.length) {
+    const char = text[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i += 1;
+        continue;
+      }
+      field += char;
+      i += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+      i += 1;
+      continue;
+    }
+
+    if (char === ',') {
+      row.push(field);
+      field = "";
+      i += 1;
+      continue;
+    }
+
+    if (char === '\n' || char === '\r') {
+      row.push(field);
+      field = "";
+      if (row.some(col => col !== "")) rows.push(row);
+      row = [];
+      if (char === '\r' && text[i + 1] === '\n') i += 2;
+      else i += 1;
+      continue;
+    }
+
+    field += char;
+    i += 1;
+  }
+
+  if (field !== "" || row.length) {
+    row.push(field);
+    if (row.some(col => col !== "")) rows.push(row);
+  }
+
+  return rows;
+}
+
+function exportDespesasToCsv() {
+  const despesas = bd.recuperarTodosRegistros();
+  if (despesas.length === 0) {
+    alert("⚠️ Nenhuma despesa para exportar!");
+    return;
+  }
+
+  const header = ["ano", "mes", "dia", "tipo", "descricao", "valor", "cartao"];
+  const rows = despesas.map(d => [
+    d.ano,
+    d.mes,
+    d.dia,
+    d.tipo,
+    d.descricao,
+    d.valor,
+    d.cartao || ""
+  ]);
+
+  const csv = [header, ...rows]
+    .map(row => row.map(csvEscape).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "orcamento-pessoal.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function importarDespesasDeCsv() {
+  const input = document.getElementById("inputCsvImport");
+  if (!input || !input.files || input.files.length === 0) {
+    alert("⚠️ Selecione um arquivo CSV!");
+    return;
+  }
+
+  const file = input.files[0];
+  const text = await file.text();
+  const rows = parseCsvText(text);
+
+  if (rows.length === 0) {
+    alert("⚠️ CSV vazio ou inválido.");
+    return;
+  }
+
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const hasHeader = header.includes("ano") && header.includes("mes") && header.includes("dia");
+
+  const idx = hasHeader
+    ? {
+        ano: header.indexOf("ano"),
+        mes: header.indexOf("mes"),
+        dia: header.indexOf("dia"),
+        tipo: header.indexOf("tipo"),
+        descricao: header.indexOf("descricao"),
+        valor: header.indexOf("valor"),
+        cartao: header.indexOf("cartao")
+      }
+    : { ano: 0, mes: 1, dia: 2, tipo: 3, descricao: 4, valor: 5, cartao: 6 };
+
+  const startRow = hasHeader ? 1 : 0;
+  const existentes = bd.recuperarTodosRegistros();
+  const existentesSet = new Set(
+    existentes.map(e => `${e.ano}|${e.mes}|${e.dia}|${e.descricao.toLowerCase().trim()}|${parseFloat(e.valor).toFixed(2)}`)
+  );
+
+  let adicionadas = 0;
+  let ignoradas = 0;
+
+  for (let i = startRow; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 6) continue;
+
+    let ano = (row[idx.ano] || "").trim();
+    let mes = (row[idx.mes] || "").trim();
+    let dia = (row[idx.dia] || "").trim();
+    const tipo = (row[idx.tipo] || "10").trim() || "10";
+    const descricao = (row[idx.descricao] || "").trim();
+    const valorStr = (row[idx.valor] || "").trim();
+    const cartao = (row[idx.cartao] || "").trim();
+
+    if (!ano || !mes || !dia || descricao.length < 3) {
+      ignoradas++;
+      continue;
+    }
+
+    mes = String(mes).padStart(2, "0");
+    dia = String(dia).padStart(2, "0");
+
+    const valor = parseValorInput(valorStr);
+    if (isNaN(valor) || valor <= 0) {
+      ignoradas++;
+      continue;
+    }
+
+    const chave = `${ano}|${mes}|${dia}|${descricao.toLowerCase().trim()}|${valor.toFixed(2)}`;
+    if (existentesSet.has(chave)) {
+      ignoradas++;
+      continue;
+    }
+
+    bd.gravar({
+      ano,
+      mes,
+      dia,
+      tipo,
+      descricao,
+      valor: valor.toFixed(2),
+      cartao
+    });
+
+    existentesSet.add(chave);
+    adicionadas++;
+  }
+
+  input.value = "";
+
+  if (typeof atualizarResumoDespesas === "function") {
+    atualizarResumoDespesas();
+  }
+
+  if (typeof carregaListaDespesas === "function") {
+    carregaListaDespesas();
+  }
+
+  alert(`✅ CSV importado: ${adicionadas} nova(s), ${ignoradas} ignorada(s).`);
 }
 
 // ==========================================
@@ -1064,6 +1309,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnImportarPdf = document.getElementById("btnImportarPdf");
   if (btnImportarPdf) {
     btnImportarPdf.addEventListener("click", importarDespesasDePdf);
+  }
+
+  // Export/Import CSV buttons
+  const btnExportCsv = document.getElementById("btnExportCsv");
+  if (btnExportCsv) {
+    btnExportCsv.addEventListener("click", exportDespesasToCsv);
+  }
+
+  const btnImportarCsv = document.getElementById("btnImportarCsv");
+  if (btnImportarCsv) {
+    btnImportarCsv.addEventListener("click", importarDespesasDeCsv);
   }
 
   // Custom file input label

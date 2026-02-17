@@ -234,6 +234,38 @@
           </div>
         </div>
       </div>
+
+      <div class="card custom-card mt-3">
+        <div class="card-body">
+          <h5 class="card-title">📦 Exportar / Importar CSV</h5>
+          <p class="section-subtle">
+            Faça backup das despesas e restaure quando precisar
+          </p>
+
+          <div class="form-group">
+            <button class="btn btn-outline-primary btn-sm" id="btnExportCsv">
+              <i class="fas fa-file-csv"></i> Exportar CSV
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="inputCsvImport">Importar CSV</label>
+            <input
+              type="file"
+              class="form-control-file"
+              id="inputCsvImport"
+              accept=".csv,text/csv"
+            />
+            <small class="text-muted">
+              Formato: ano,mes,dia,tipo,descricao,valor,cartao
+            </small>
+          </div>
+
+          <button class="btn btn-primary btn-sm" id="btnImportarCsv">
+            <i class="fas fa-file-import"></i> Importar CSV
+          </button>
+        </div>
+      </div>
     </div>
 
     <div id="undoPanel"></div>
