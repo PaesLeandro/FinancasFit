@@ -36,6 +36,8 @@ body {
   font-weight: 500;
   transition: all 0.2s ease;
   color: rgba(255, 255, 255, 0.9) !important;
+  position: relative;
+  padding-bottom: 0.5rem !important;
 }
 
 .nav-link:hover {
@@ -43,8 +45,23 @@ body {
   color: #fff !important;
 }
 
+.nav-item.active .nav-link,
 .nav-link.active {
   color: #fff !important;
+  font-weight: 600;
+}
+
+.nav-item.active .nav-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 3px;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.3);
 }
 
 /* Container Principal */
