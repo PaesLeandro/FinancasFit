@@ -348,7 +348,24 @@
           (sum, item) => sum + (parseFloat(item.valor) || 0),
           0,
         );
-        document.getElementById("totalRegistros").textContent = d.length;
+        
+        // 🔧 CONTAR REGISTROS AGRUPADOS (sem data para agrupar parceladas)
+        const grupos = new Map();
+        d.forEach(item => {
+          // Extrair descrição base de forma robusta
+          const descricaoBase = item.descricao.includes("(") 
+            ? item.descricao.substring(0, item.descricao.lastIndexOf("(")).trim()
+            : item.descricao;
+          // Chave SEM DATA para agrupar parceladas em meses diferentes
+          const chave = `${descricaoBase}_${item.tipo}_${item.cartao || ""}`;
+          
+          if (!grupos.has(chave)) {
+            grupos.set(chave, true);
+          }
+        });
+        
+        const countRegistros = grupos.size;
+        document.getElementById("totalRegistros").textContent = countRegistros;
 
         const filtrosAtivos =
           document.getElementById("ano").value ||

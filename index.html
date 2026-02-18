@@ -324,23 +324,37 @@
                 onchange="toggleParcelas()"
               />
               <label class="form-check-label" for="checkParcelado"
-                >Compra Parcelada?</label
+                >💳 Compra Parcelada?</label
               >
             </div>
 
             <div class="form-group" id="divParcelas" style="display: none">
-              <label>Quantidade de Parcelas</label>
-              <input
-                type="number"
-                class="form-control"
-                id="modalQtdParcelas"
-                min="2"
-                max="48"
-                value="2"
-              />
-              <small class="text-muted"
-                >O sistema criará lançamentos futuros automaticamente.</small
+              <label for="modalQtdParcelas"
+                ><strong>Quantidade de Parcelas</strong></label
               >
+              <div class="input-group">
+                <input
+                  type="number"
+                  class="form-control"
+                  id="modalQtdParcelas"
+                  min="2"
+                  max="48"
+                  value="2"
+                  onchange="atualizarPreviewParcelas()"
+                  oninput="atualizarPreviewParcelas()"
+                />
+                <div class="input-group-append">
+                  <span class="input-group-text">parcelas</span>
+                </div>
+              </div>
+              <small
+                class="text-muted"
+                id="previewParcelas"
+                style="display: block; margin-top: 0.5rem"
+              >
+                ℹ️ Será dividido em 2 lançamentos de:
+                <strong id="valorParcela">R$ 0,00</strong>
+              </small>
             </div>
           </div>
           <div class="modal-footer">

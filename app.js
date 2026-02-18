@@ -271,7 +271,35 @@ function calcularVencimento(dataCompra, cartao) {
 function toggleParcelas() {
   const checked = document.getElementById("checkParcelado").checked;
   document.getElementById("divParcelas").style.display = checked ? "block" : "none";
+  if (checked) {
+    atualizarPreviewParcelas();
+  }
 }
+
+// ==========================================
+// ATUALIZAR PREVIEW DE PARCELAS
+// ==========================================
+function atualizarPreviewParcelas() {
+  const valorStr = document.getElementById("modalValor").value.trim();
+  const valor = parseValorInput(valorStr);
+  const qtdParcelas = parseInt(document.getElementById("modalQtdParcelas").value) || 2;
+  
+  if (isNaN(valor) || valor <= 0) {
+    document.getElementById("previewParcelas").textContent = "ℹ️ Preencha o valor para ver o preview";
+    return;
+  }
+  
+  const valorParcela = valor / qtdParcelas;
+  const valorFormatado = valorParcela.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+  
+  document.getElementById("valorParcela").textContent = valorFormatado;
+  document.getElementById("previewParcelas").innerHTML = 
+    `ℹ️ Será dividido em <strong>${qtdParcelas}</strong> lançamentos de: <strong id="valorParcela">${valorFormatado}</strong>`;
+}
+
 
 function parseValorInput(valorStr) {
   const limpo = valorStr.replace(/\./g, "").replace(",", ".");
@@ -279,81 +307,140 @@ function parseValorInput(valorStr) {
 }
 
 // ==========================================
+// FORMATAR VALOR DE MOEDA (MÁSCARA)
+// ==========================================
+function formatarValorMoeda(event) {
+  let valor = event.target.value;
+  
+  // Remove tudo que não é dígito
+  valor = valor.replace(/\D/g, "");
+  
+  if (!valor) {
+    event.target.value = "";
+    return;
+  }
+  
+  // Converte para número (centavos)
+  let num = parseInt(valor) / 100;
+  
+  // Formata com pontos de milhar e vírgula de decimal
+  const valorFormatado = num.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  
+  event.target.value = valorFormatado;
+}
+
+// ==========================================
 // CADASTRAR DESPESA
 // ==========================================
+let cadastrandoDespesa = false; // Flag para evitar dupla submissão
+let ultimoTempoSubmissao = 0; // Timestamp da última submissão
+
 function cadastrarDespesa() {
-  const data = document.getElementById("modalData").value;
-  const tipo = document.getElementById("modalTipo").value;
-  const descricao = document.getElementById("modalDescricao").value.trim();
-  const valorStr = document.getElementById("modalValor").value.trim();
-  const valor = parseValorInput(valorStr);
-  const cartaoIdx = document.getElementById("modalCartaoVinculado").value;
-
-  if (!data || !tipo || descricao.length < 3 || isNaN(valor) || valor <= 0) {
-    exibirMensagem("⚠️ Preencha todos os campos corretamente!", "Erro", "danger");
+  console.log("🔍 Botão clicado - Iniciando cadastro...");
+  
+  // Previne dupla submissão (com timeout de 800ms)
+  const agora = Date.now();
+  if (cadastrandoDespesa || (agora - ultimoTempoSubmissao < 800)) {
+    console.warn("⚠️ Cadastro já em andamento ou clique muito rápido, ignorando");
     return;
   }
+  cadastrandoDespesa = true;
+  ultimoTempoSubmissao = agora;
 
-  const cartoes = getCartoes();
-  const cartao = cartaoIdx !== "" ? cartoes[parseInt(cartaoIdx)] : null;
+  try {
+    const data = document.getElementById("modalData").value;
+    const tipo = document.getElementById("modalTipo").value;
+    const descricao = document.getElementById("modalDescricao").value.trim();
+    const valorStr = document.getElementById("modalValor").value.trim();
+    const valor = parseValorInput(valorStr);
+    const cartaoIdx = document.getElementById("modalCartaoVinculado").value;
 
-  const isParcelado = document.getElementById("checkParcelado").checked;
-  const qtdParcelas = isParcelado ? parseInt(document.getElementById("modalQtdParcelas").value) : 1;
+    console.log("📝 Dados capturados:", { data, tipo, descricao, valor, cartaoIdx });
 
-  if (qtdParcelas < 1 || qtdParcelas > 48) {
-    exibirMensagem("⚠️ Número de parcelas inválido!", "Erro", "danger");
-    return;
+    if (!data || !tipo || descricao.length < 3 || isNaN(valor) || valor <= 0) {
+      console.error("❌ Validação falhou:", { data, tipo, descricaoLen: descricao.length, valor });
+      exibirMensagem("⚠️ Preencha todos os campos corretamente!", "Erro", "danger");
+      cadastrandoDespesa = false;
+      return;
+    }
+
+    const cartoes = getCartoes();
+    const cartao = cartaoIdx !== "" ? cartoes[parseInt(cartaoIdx)] : null;
+
+    const isParcelado = document.getElementById("checkParcelado").checked;
+    const qtdParcelas = isParcelado ? parseInt(document.getElementById("modalQtdParcelas").value) : 1;
+
+    console.log("✅ Parcelamento:", { isParcelado, qtdParcelas });
+
+    if (qtdParcelas < 1 || qtdParcelas > 48) {
+      console.error("❌ Número de parcelas inválido:", qtdParcelas);
+      exibirMensagem("⚠️ Número de parcelas inválido!", "Erro", "danger");
+      cadastrandoDespesa = false;
+      return;
+    }
+
+    const valorParcela = valor / qtdParcelas;
+
+    for (let i = 0; i < qtdParcelas; i++) {
+      const dataCompra = new Date(data + "T00:00:00");
+      dataCompra.setMonth(dataCompra.getMonth() + i);
+
+      const dataVenc = cartao
+        ? calcularVencimento(dataCompra.toISOString().split("T")[0], cartao)
+        : dataCompra.toISOString().split("T")[0];
+
+      const [anoVenc, mesVenc, diaVenc] = dataVenc.split("-");
+
+      const descFinal = qtdParcelas > 1
+        ? `${descricao} (${i + 1}/${qtdParcelas})`
+        : descricao;
+
+      const despesa = {
+        ano: anoVenc,
+        mes: mesVenc,
+        dia: diaVenc,
+        tipo: tipo,
+        descricao: descFinal,
+        valor: valorParcela.toFixed(2),
+        cartao: cartao ? cartao.nome : ""
+      };
+
+      console.log(`💾 Salvando parcela ${i + 1}:`, despesa);
+      bd.gravar(despesa);
+    }
+
+    $("#modalCadastrarDespesa").modal("hide");
+    exibirMensagem(
+      `✅ ${qtdParcelas > 1 ? qtdParcelas + " parcelas" : "Despesa"} cadastrada com sucesso!`,
+      "Sucesso",
+      "success"
+    );
+
+    // Limpar formulário
+    document.getElementById("modalData").value = "";
+    document.getElementById("modalTipo").value = "";
+    document.getElementById("modalDescricao").value = "";
+    document.getElementById("modalValor").value = "";
+    document.getElementById("modalCartaoVinculado").value = "";
+    document.getElementById("checkParcelado").checked = false;
+    toggleParcelas();
+
+    // Atualizar resumo se estiver na página index
+    if (typeof atualizarResumoDespesas === "function") {
+      atualizarResumoDespesas();
+    }
+
+    console.log("✨ Cadastro completo!");
+  } catch (erro) {
+    console.error("💥 Erro ao cadastrar:", erro);
+    exibirMensagem("❌ Erro ao cadastrar despesa: " + erro.message, "Erro", "danger");
   }
 
-  const valorParcela = valor / qtdParcelas;
-
-  for (let i = 0; i < qtdParcelas; i++) {
-    const dataCompra = new Date(data + "T00:00:00");
-    dataCompra.setMonth(dataCompra.getMonth() + i);
-
-    const dataVenc = cartao
-      ? calcularVencimento(dataCompra.toISOString().split("T")[0], cartao)
-      : dataCompra.toISOString().split("T")[0];
-
-    const [anoVenc, mesVenc, diaVenc] = dataVenc.split("-");
-
-    const descFinal = qtdParcelas > 1
-      ? `${descricao} (${i + 1}/${qtdParcelas})`
-      : descricao;
-
-    const despesa = {
-      ano: anoVenc,
-      mes: mesVenc,
-      dia: diaVenc,
-      tipo: tipo,
-      descricao: descFinal,
-      valor: valorParcela.toFixed(2),
-      cartao: cartao ? cartao.nome : ""
-    };
-
-    bd.gravar(despesa);
-  }
-
-  $("#modalCadastrarDespesa").modal("hide");
-  exibirMensagem(
-    `✅ ${qtdParcelas > 1 ? qtdParcelas + " parcelas" : "Despesa"} cadastrada com sucesso!`,
-    "Sucesso",
-    "success"
-  );
-
-  // Limpar formulário
-  document.getElementById("modalData").value = "";
-  document.getElementById("modalTipo").value = "";
-  document.getElementById("modalDescricao").value = "";
-  document.getElementById("modalValor").value = "";
-  document.getElementById("modalCartaoVinculado").value = "";
-  document.getElementById("checkParcelado").checked = false;
-  toggleParcelas();
-
-  // Atualizar resumo se estiver na página index
-  if (typeof atualizarResumoDespesas === "function") {
-    atualizarResumoDespesas();
-  }
+  // Permite nova submissão
+  cadastrandoDespesa = false;
 }
 
 // ==========================================
@@ -382,16 +469,73 @@ function carregaListaDespesas(despesas = [], filtro = false) {
     indiceMap.get(key).push(idx);
   });
 
-  lista.innerHTML = "";
+  // 🔧 AGRUPAR PARCELADAS
+  const despesasAgrupadas = [];
+  const jaProcessadas = new Set();
 
   despesas.forEach((d) => {
-    // Encontrar índice real no banco de dados
-    const key = `${d.ano}|${d.mes}|${d.dia}|${d.descricao}|${d.valor}|${d.tipo}`;
-    const indices = indiceMap.get(key) || [];
-    const indiceReal = indices.length ? indices.shift() : -1;
+    // Extrair descrição base (versão robusta, sem "(x/y)")
+    const descricaoBase = d.descricao.includes("(") 
+      ? d.descricao.substring(0, d.descricao.lastIndexOf("(")).trim()
+      : d.descricao;
+    
+    // Chave para agrupar
+    const chaveGrupo = `${d.ano}|${d.mes}|${d.dia}|${descricaoBase}|${d.tipo}|${d.cartao}`;
 
+    // Se ainda não foi processada, verificar se é parcelada
+    if (!jaProcessadas.has(chaveGrupo)) {
+      jaProcessadas.add(chaveGrupo);
+      
+      // Encontrar todas as parcelas com mesma chave
+      const parcelas = despesas.filter(item => {
+        const itemDescBase = item.descricao.includes("(") 
+          ? item.descricao.substring(0, item.descricao.lastIndexOf("(")).trim()
+          : item.descricao;
+        return itemDescBase === descricaoBase && 
+               item.ano === d.ano && 
+               item.mes === d.mes && 
+               item.dia === d.dia &&
+               item.tipo === d.tipo &&
+               item.cartao === d.cartao;
+      });
+
+      if (parcelas.length > 1) {
+        // Somar todas as parcelas
+        const valorTotal = parcelas.reduce((sum, p) => sum + parseFloat(p.valor), 0);
+        despesasAgrupadas.push({
+          ...d,
+          descricao: descricaoBase,
+          valor: valorTotal.toFixed(2),
+          qtdParcelas: parcelas.length,
+          ehParcelada: true,
+          indicesReais: parcelas.map(p => {
+            const key = `${p.ano}|${p.mes}|${p.dia}|${p.descricao}|${p.valor}|${p.tipo}`;
+            const indices = indiceMap.get(key) || [];
+            return indices.length ? indices.shift() : -1;
+          })
+        });
+      } else {
+        // Só 1 parcela (não agrupar)
+        const key = `${d.ano}|${d.mes}|${d.dia}|${d.descricao}|${d.valor}|${d.tipo}`;
+        const indices = indiceMap.get(key) || [];
+        const indiceReal = indices.length ? indices.shift() : -1;
+        despesasAgrupadas.push({
+          ...d,
+          indicesReais: [indiceReal]
+        });
+      }
+    }
+  });
+
+  lista.innerHTML = "";
+
+  despesasAgrupadas.forEach((d) => {
     const dataVenc = `${String(d.dia).padStart(2, "0")}/${String(d.mes).padStart(2, "0")}/${d.ano}`;
     const valorFormatado = `R$ ${parseFloat(d.valor).toFixed(2).replace(".", ",")}`;
+    const indiceReal = d.indicesReais[0];
+    
+    // Label de parcelas se houver
+    const labelParcelas = d.ehParcelada ? ` <small class="badge badge-info">${d.qtdParcelas}x</small>` : "";
 
     const linha = `
       <tr class="fade-in-row">
@@ -400,7 +544,7 @@ function carregaListaDespesas(despesas = [], filtro = false) {
         </td>
         <td>${dataVenc}</td>
         <td>${d.cartao || getNomeCategoria(d.tipo)}</td>
-        <td>${d.descricao}</td>
+        <td>${d.descricao}${labelParcelas}</td>
         <td class="text-right"><strong>${valorFormatado}</strong></td>
         <td class="text-center">
           <button class="btn btn-outline-primary btn-sm mr-1" onclick="editarValorDespesa(${indiceReal})">
@@ -609,6 +753,94 @@ function exibirMensagem(msg, titulo, tipo) {
 }
 
 // ==========================================
+// CONTAR DESPESAS AGRUPADAS (sem duplicatas de parceladas)
+// ==========================================
+function contarDespesasAgrupadas(despesas) {
+  console.log(`\n${'='.repeat(70)}`);
+  console.log(`🔍 INICIANDO CONTAGEM DE DESPESAS AGRUPADAS`);
+  console.log(`${'='.repeat(70)}`);
+  console.log(`Total de registros a processar: ${despesas.length}\n`);
+  
+  const grupos = new Map();
+  
+  despesas.forEach((d, idx) => {
+    console.log(`[${idx + 1}/${despesas.length}] Processando registro:`);
+    console.log(`    Descrição original: "${d.descricao}"`);
+    console.log(`    Data: ${d.dia}/${d.mes}/${d.ano}`);
+    
+    // Extrair descrição base (remover " (x/y)" de forma robusta)
+    const ultimaAberta = d.descricao.lastIndexOf("(");
+    const temParenteses = ultimaAberta > 0 && d.descricao.includes("(");
+    
+    let descricaoBase;
+    if (temParenteses) {
+      descricaoBase = d.descricao.substring(0, ultimaAberta).trim();
+      console.log(`    ✂️ É parcelada! Cortando parênteses em posição ${ultimaAberta}`);
+    } else {
+      descricaoBase = d.descricao;
+      console.log(`    - Não é parcelada (sem parênteses)`);
+    }
+    console.log(`    → Descrição base extraída: "${descricaoBase}"`);
+    
+    // 🔑 CHAVE SEM DATA (para agrupar parceladas em meses diferentes)
+    const chave = `${descricaoBase}_${d.tipo}_${d.cartao || "?"}`;
+    console.log(`    📌 Chave gerada: "${chave}"`);
+    
+    // Verificar se chave já existe
+    const jaExiste = grupos.has(chave);
+    console.log(`    Chave já no mapa? ${jaExiste}`);
+    
+    if (!jaExiste) {
+      console.log(`    ➕ CRIAR novo grupo`);
+      grupos.set(chave, {
+        descricao: descricaoBase,
+        tipo: d.tipo,
+        cartao: d.cartao,
+        valor_total: 0,
+        parcelas: 0,
+        detalhes: []
+      });
+    } else {
+      console.log(`    ♻️ ACUMULAR no grupo existente`);
+    }
+    
+    // Somar valores
+    const grupo = grupos.get(chave);
+    const valorNum = parseFloat(d.valor);
+    grupo.valor_total += valorNum;
+    grupo.parcelas++;
+    grupo.detalhes.push(`${d.descricao} em ${d.dia}/${d.mes}/${d.ano} (R$ ${valorNum.toFixed(2)})`);
+    
+    console.log(`    💰 Soma parcial do grupo agora: R$ ${grupo.valor_total.toFixed(2)} em ${grupo.parcelas} parcelas`);
+    console.log();
+  });
+  
+  console.log(`\n${'='.repeat(70)}`);
+  console.log(`📊 RESULTADO FINAL DA CONTAGEM`);
+  console.log(`${'='.repeat(70)}`);
+  console.log(`   ✓ Total de registros internos: ${despesas.length}`);
+  console.log(`   ✓ Total de grupos únicos: ${grupos.size}`);
+  console.log(`${'='.repeat(70)}`);
+  
+  let contador = 1;
+  grupos.forEach((grupo, chave) => {
+    console.log(`\n   GRUPO ${contador}:`);
+    console.log(`     Descrição: "${grupo.descricao}"`);
+    console.log(`     Tipo: ${grupo.tipo}`);
+    console.log(`     Cartão: ${grupo.cartao || "Débito/Sem cartão"}`);
+    console.log(`     Parcelas: ${grupo.parcelas}x`);
+    console.log(`     Valor Total: R$ ${grupo.valor_total.toFixed(2)}`);
+    console.log(`     Detalhes:`);
+    grupo.detalhes.forEach(d => console.log(`       • ${d}`));
+    contador++;
+  });
+  
+  console.log(`${'='.repeat(70)}\n`);
+  
+  return grupos.size;
+}
+
+// ==========================================
 // RESUMO E GRÁFICO (INDEX.HTML)
 // ==========================================
 function atualizarResumoDespesas() {
@@ -617,6 +849,9 @@ function atualizarResumoDespesas() {
 
   const resumoDiv = document.getElementById("resumoDespesas");
   if (!resumoDiv) return;
+
+  // Contar despesas agrupadas
+  const countRegistros = contarDespesasAgrupadas(despesas);
 
   const porCategoria = {};
   despesas.forEach(d => {
@@ -635,7 +870,7 @@ function atualizarResumoDespesas() {
       </div>
       <div class="col-md-6">
         <h6>📊 Total de Registros</h6>
-        <h3>${despesas.length}</h3>
+        <h3>${countRegistros}</h3>
       </div>
     </div>
     <hr>
@@ -1206,6 +1441,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      if (vencimento === fechamento) {
+        alert("❌ Vencimento e Fechamento não podem ser o mesmo dia!");
+        return;
+      }
+
       const cartoes = getCartoes();
       cartoes.push({ nome, bandeira, vencimento, fechamento });
       saveCartoes(cartoes);
@@ -1238,6 +1478,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnExportPdf = document.getElementById("btnExportPdf");
   if (btnExportPdf) {
     btnExportPdf.addEventListener("click", exportDespesasToPdf);
+  }
+
+  // Formatação de moeda em tempo real no input de valor
+  const inputValor = document.getElementById("modalValor");
+  if (inputValor) {
+    inputValor.addEventListener("input", formatarValorMoeda);
+    // Atualizar preview de parcelas quando valor muda
+    inputValor.addEventListener("input", () => {
+      if (document.getElementById("checkParcelado").checked) {
+        atualizarPreviewParcelas();
+      }
+    });
   }
 
   // Custom file input label
