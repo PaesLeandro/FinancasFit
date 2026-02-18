@@ -1,6 +1,46 @@
+# Sistema operacional
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Configurações
 .vercel
-node_modules
-*.log
 .env
+.env.local
+.env.*.local
+
+# Dependências Node (se usar)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Logs e cache
+*.log
+logs/
+.cache/
+
+# Dados pessoais/backup
+*_backup.*
+*_export.*
+*_dados.*
+localStorage_dump.json
+despesas_pessoais.json
+
+# IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Build e dist
+dist/
+build/
+.parcel-cache/
+
+# OS específico
+Thumbs.db
+.DS_Store

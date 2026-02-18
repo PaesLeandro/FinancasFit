@@ -1,7 +1,23 @@
 // ==========================================
 // ORÇAMENTO PESSOAL - APP.JS
 // Sistema de Controle Financeiro Pessoal
+// 
+// ⚠️ PROPRIEDADE INTELECTUAL
+// Copyright © 2026 Paes_Tech Sistemas
+// Todos os direitos reservados
+// 
+// Licença: MIT (uso pessoal/educacional)
+// Uso comercial requer permissão explícita
+// 
+// ⛔ PROIBIDO:
+// - Cópia para fins comerciais
+// - Redistribuição sem crédito
+// - Remoção de headers de copyright
+// 
+// Reportar vulnerabilidades: seu_email@exemplo.com
 // ==========================================
+
+'use strict'; // Modo strict para maior segurança
 
 class Bd {
   constructor() {
