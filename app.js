@@ -84,6 +84,11 @@ class Bd {
     arr.splice(index, 1);
     localStorage.setItem("despesas", JSON.stringify(arr));
   }
+
+  // Salvar todas as despesas de uma vez
+  salvarTodas(despesas) {
+    localStorage.setItem("despesas", JSON.stringify(despesas));
+  }
 }
 
 const bd = new Bd();
@@ -405,7 +410,8 @@ function cadastrarDespesa() {
         tipo: tipo,
         descricao: descFinal,
         valor: valorParcela.toFixed(2),
-        cartao: cartao ? cartao.nome : ""
+        cartao: cartao ? cartao.nome : "",
+        pago: false
       };
 
       console.log(`💾 Salvando parcela ${i + 1}:`, despesa);
@@ -502,12 +508,16 @@ function carregaListaDespesas(despesas = [], filtro = false) {
       if (parcelas.length > 1) {
         // Somar todas as parcelas
         const valorTotal = parcelas.reduce((sum, p) => sum + parseFloat(p.valor), 0);
+        // Verificar se TODAS as parcelas estão pagas
+        const todasPagas = parcelas.every(p => p.pago === true);
+        
         despesasAgrupadas.push({
           ...d,
           descricao: descricaoBase,
           valor: valorTotal.toFixed(2),
           qtdParcelas: parcelas.length,
           ehParcelada: true,
+          pago: todasPagas,
           indicesReais: parcelas.map(p => {
             const key = `${p.ano}|${p.mes}|${p.dia}|${p.descricao}|${p.valor}|${p.tipo}`;
             const indices = indiceMap.get(key) || [];
@@ -536,11 +546,23 @@ function carregaListaDespesas(despesas = [], filtro = false) {
     
     // Label de parcelas se houver
     const labelParcelas = d.ehParcelada ? ` <small class="badge badge-info">${d.qtdParcelas}x</small>` : "";
+    
+    // Status de pago (compatível com despesas antigas sem campo pago)
+    const estaPago = d.pago === true;
+    const classePago = estaPago ? 'despesa-paga' : '';
+    const iconePago = estaPago 
+      ? '<i class="fas fa-check-circle text-success"></i>' 
+      : '<i class="far fa-circle text-muted"></i>';
 
     const linha = `
-      <tr class="fade-in-row">
+      <tr class="fade-in-row ${classePago}">
         <td>
           <input type="checkbox" class="checkDespesa" value="${indiceReal}" onchange="atualizarBotaoExcluir()" />
+        </td>
+        <td class="text-center">
+          <span class="cursor-pointer status-pago-toggle" data-indice="${indiceReal}" title="${estaPago ? 'Marcar como não paga' : 'Marcar como paga'}">
+            ${iconePago}
+          </span>
         </td>
         <td>${dataVenc}</td>
         <td>${d.cartao || getNomeCategoria(d.tipo)}</td>
@@ -559,6 +581,26 @@ function carregaListaDespesas(despesas = [], filtro = false) {
     lista.innerHTML += linha;
   });
   
+  // Adicionar event listeners aos ícones de status
+  document.querySelectorAll('.status-pago-toggle').forEach(span => {
+    span.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      const indice = parseInt(this.getAttribute('data-indice'));
+      
+      // Verificar se é parcelada
+      const despesas = bd.recuperarTodosRegistros();
+      const despesa = despesas[indice];
+      if (despesa && despesa.descricao.match(/^(.*)\s\(\d+\/\d+\)$/)) {
+        // Abrir modal de seleção de parcelas
+        abrirModalParcelas(indice);
+      } else {
+        // Marcar diretamente
+        togglePago(indice);
+      }
+    });
+  });
+  
   // Resetar checkbox de selecionar todos
   const checkAll = document.getElementById("checkAll");
   if (checkAll) checkAll.checked = false;
@@ -573,9 +615,18 @@ function pesquisarDespesa() {
   const mes = document.getElementById("mes").value;
   const tipo = document.getElementById("tipo").value;
   const descricao = document.getElementById("descricao").value;
+  const statusPago = document.getElementById("statusPago")?.value || "";
 
   const despesa = { ano, mes, tipo, descricao };
-  const resultado = bd.pesquisar(despesa);
+  let resultado = bd.pesquisar(despesa);
+  
+  // Aplicar filtro de status pago
+  if (statusPago === "pago") {
+    resultado = resultado.filter(d => d.pago === true);
+  } else if (statusPago === "naopago") {
+    resultado = resultado.filter(d => !d.pago || d.pago === false);
+  }
+  
   carregaListaDespesas(resultado, true);
 }
 
@@ -608,6 +659,192 @@ function removerDespesa(idx) {
 
   mostrarUndo();
   if (typeof atualizarResumoDespesas === "function") {
+    atualizarResumoDespesas();
+  }
+}
+
+// ==========================================
+// MARCAR COMO PAGA
+// ==========================================
+let togglePagoEmExecucao = false; // Prevenir chamadas duplicadas
+
+function togglePago(indice) {
+  if (togglePagoEmExecucao) {
+    console.warn(`⚠️ togglePago já está em execução, ignorando chamada duplicada`);
+    return;
+  }
+  
+  togglePagoEmExecucao = true;
+  
+  console.log(`🔄 togglePago chamado para índice: ${indice}`);
+  const despesas = bd.recuperarTodosRegistros();
+  
+  if (indice >= 0 && indice < despesas.length) {
+    const despesa = despesas[indice];
+    
+    // Garantir que campo pago existe (não deveria acontecer após migração)
+    if (despesa.pago === undefined || despesa.pago === null) {
+      despesa.pago = false;
+      console.log(`🔧 Campo 'pago' não existia no índice ${indice}, inicializado como false`);
+    }
+    
+    const novoStatus = !despesa.pago;
+    
+    console.log(`📝 Despesa: "${despesa.descricao}" | Status: ${despesa.pago} → ${novoStatus}`);
+    
+    // Marcar apenas esta despesa (parcela específica ou simples)
+    despesa.pago = novoStatus;
+    
+    // Mostrar toast com status atualizado
+    const status = novoStatus ? "✅ paga" : "⏳ não paga";
+    const descricaoCurta = despesa.descricao.length > 40 
+      ? despesa.descricao.substring(0, 37) + "..." 
+      : despesa.descricao;
+    mostrarToastPago(`${descricaoCurta} - ${status}`);
+    
+    console.log(`✨ Despesa marcada como ${status}`);
+    
+    bd.salvarTodas(despesas);
+    console.log(`💾 Dados salvos`);
+    
+    // Recarregar lista
+    if (typeof carregaListaDespesas === "function") {
+      carregaListaDespesas();
+    }
+    
+    // Atualizar resumo se existir
+    if (typeof atualizarResumoDespesas === "function") {
+      atualizarResumoDespesas();
+    }
+  } else {
+    console.error(`❌ Índice inválido: ${indice}`);
+  }
+  
+  // Permitir nova chamada após pequeno delay
+  setTimeout(() => {
+    togglePagoEmExecucao = false;
+  }, 500);
+}
+
+function mostrarToastPago(mensagem) {
+  const toast = document.createElement('div');
+  toast.className = 'toast-pago';
+  toast.textContent = mensagem;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 10);
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 1500);
+}
+
+// ==========================================
+// MODAL DE SELEÇÃO DE PARCELAS
+// ==========================================
+let parcelasParaMarcar = [];
+
+function abrirModalParcelas(indice) {
+  const despesas = bd.recuperarTodosRegistros();
+  const despesa = despesas[indice];
+  
+  if (!despesa) return;
+  
+  // Extrair descrição base
+  const parcelMatch = despesa.descricao.match(/^(.*)\s\(\d+\/\d+\)$/);
+  if (!parcelMatch) return;
+  
+  const descricaoBase = parcelMatch[1];
+  
+  // Encontrar todas as parcelas
+  parcelasParaMarcar = [];
+  despesas.forEach((d, idx) => {
+    const match = d.descricao.match(/^(.*)\s\((\d+)\/(\d+)\)$/);
+    if (match && match[1] === descricaoBase && 
+        d.tipo === despesa.tipo && d.cartao === despesa.cartao) {
+      parcelasParaMarcar.push({
+        indice: idx,
+        descricao: d.descricao,
+        parcela: parseInt(match[2]),
+        total: parseInt(match[3]),
+        data: `${String(d.dia).padStart(2, '0')}/${String(d.mes).padStart(2, '0')}/${d.ano}`,
+        valor: parseFloat(d.valor),
+        pago: d.pago === true
+      });
+    }
+  });
+  
+  // Ordenar por número de parcela
+  parcelasParaMarcar.sort((a, b) => a.parcela - b.parcela);
+  
+  // Atualizar modal
+  document.getElementById('descricaoParcelada').textContent = descricaoBase;
+  
+  const tbody = document.getElementById('listaParcelasModal');
+  tbody.innerHTML = '';
+  
+  parcelasParaMarcar.forEach((p) => {
+    const valorFormatado = `R$ ${p.valor.toFixed(2).replace('.', ',')}`;
+    const statusIcon = p.pago 
+      ? '<span class="badge badge-success">✅ Paga</span>' 
+      : '<span class="badge badge-warning">⏳ Pendente</span>';
+    
+    const linha = `
+      <tr class="${p.pago ? 'table-success' : ''}">
+        <td>
+          <input type="checkbox" class="checkParcela" value="${p.indice}" 
+                 ${p.pago ? 'disabled' : ''} />
+        </td>
+        <td>${p.parcela}/${p.total}</td>
+        <td>${p.data}</td>
+        <td><strong>${valorFormatado}</strong></td>
+        <td class="text-center">${statusIcon}</td>
+      </tr>
+    `;
+    tbody.innerHTML += linha;
+  });
+  
+  // Limpar checkbox "selecionar todas"
+  document.getElementById('checkAllParcelas').checked = false;
+  
+  // Abrir modal
+  $('#modalSelecionarParcelas').modal('show');
+}
+
+function toggleTodasParcelas() {
+  const checkAll = document.getElementById('checkAllParcelas');
+  const checkboxes = document.querySelectorAll('.checkParcela:not(:disabled)');
+  checkboxes.forEach(cb => cb.checked = checkAll.checked);
+}
+
+function marcarParcelasSelecionadas() {
+  const checkboxes = document.querySelectorAll('.checkParcela:checked');
+  const indices = Array.from(checkboxes).map(cb => parseInt(cb.value));
+  
+  if (indices.length === 0) {
+    alert('⚠️ Selecione pelo menos uma parcela!');
+    return;
+  }
+  
+  const despesas = bd.recuperarTodosRegistros();
+  indices.forEach(idx => {
+    if (despesas[idx]) {
+      despesas[idx].pago = true;
+    }
+  });
+  
+  bd.salvarTodas(despesas);
+  
+  // Fechar modal
+  $('#modalSelecionarParcelas').modal('hide');
+  
+  // Mostrar toast
+  mostrarToastPago(`✅ ${indices.length} parcela(s) marcada(s) como paga(s)`);
+  
+  // Recarregar lista
+  if (typeof carregaListaDespesas === 'function') {
+    carregaListaDespesas();
+  }
+  if (typeof atualizarResumoDespesas === 'function') {
     atualizarResumoDespesas();
   }
 }
@@ -1403,9 +1640,34 @@ function carregarCartoesNoPdfImport() {
 }
 
 // ==========================================
+// MIGRAÇÃO DE DADOS
+// ==========================================
+function migrarDespesasAntigas() {
+  const despesas = bd.recuperarTodosRegistros();
+  let migradas = 0;
+  
+  despesas.forEach((d) => {
+    if (d.pago === undefined || d.pago === null) {
+      d.pago = false;
+      migradas++;
+    }
+  });
+  
+  if (migradas > 0) {
+    bd.salvarTodas(despesas);
+    console.log(`✨ Migração concluída: ${migradas} despesas atualizadas com campo 'pago'`);
+  } else {
+    console.log(`✓ Todas as despesas já possuem campo 'pago'`);
+  }
+}
+
+// ==========================================
 // INICIALIZAÇÃO
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
+  // Migrar despesas antigas (adicionar campo 'pago' se não existir)
+  migrarDespesasAntigas();
+  
   preencherCategorias();
   carregarCartoesNoSelect();
   atualizarListaCartoes();

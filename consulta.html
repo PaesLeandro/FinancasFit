@@ -58,7 +58,7 @@
           <ul class="navbar-nav ml-auto">
             <li class="nav-item">
               <a class="nav-link" href="index.html"
-                ><i class="fas fa-plus-circle"></i> Cadastro</a
+                ><i class="fas fa-plus-circle"></i> Início</a
               >
             </li>
             <li class="nav-item active">
@@ -119,13 +119,20 @@
           </div>
 
           <div class="form-row mt-2">
-            <div class="col-md-8 mb-2">
+            <div class="col-md-6 mb-2">
               <input
                 type="text"
                 class="form-control"
                 placeholder="Descrição..."
                 id="descricao"
               />
+            </div>
+            <div class="col-md-2 mb-2">
+              <select class="form-control" id="statusPago">
+                <option value="">Todas</option>
+                <option value="pago">✅ Pagas</option>
+                <option value="naopago">⏳ Não Pagas</option>
+              </select>
             </div>
             <div class="col-md-2 mb-2">
               <button
@@ -154,6 +161,14 @@
           >
             <h5 class="mb-2 mb-md-0">
               Resultados (<span id="totalRegistros">0</span>)
+              <small class="text-muted ml-2" style="font-size: 0.85rem">
+                <span class="badge badge-success"
+                  >✅ <span id="countPagas">0</span> pagas</span
+                >
+                <span class="badge badge-warning"
+                  >⏳ <span id="countNaoPagas">0</span> não pagas</span
+                >
+              </small>
             </h5>
             <div>
               <button
@@ -184,6 +199,7 @@
                       onchange="toggleTodos()"
                     />
                   </th>
+                  <th width="50" class="text-center">Status</th>
                   <th>Vencimento</th>
                   <th>Cartão/Tipo</th>
                   <th>Descrição</th>
@@ -199,10 +215,26 @@
 
       <div class="card custom-card mt-3">
         <div class="card-body text-center">
-          <h4>
-            Total Filtrado:
-            <span id="totalDespesas" class="text-primary">R$ 0,00</span>
-          </h4>
+          <div class="row">
+            <div class="col-md-6 mb-2">
+              <h5>Total Geral</h5>
+              <h4 class="text-primary">
+                <span id="totalGeral">R$ 0,00</span>
+              </h4>
+              <small class="text-muted">Valor total a pagar</small>
+            </div>
+            <div class="col-md-6 mb-2">
+              <h5>A Pagar</h5>
+              <h4 class="text-danger">
+                <span id="totalDespesas">R$ 0,00</span>
+              </h4>
+              <small class="text-muted">Despesas não pagas</small>
+            </div>
+          </div>
+          <hr />
+          <small class="text-muted">
+            Clique no ícone de status para atualizar os valores
+          </small>
         </div>
       </div>
 
@@ -270,6 +302,64 @@
     </div>
 
     <div id="undoPanel"></div>
+
+    <!-- Modal de Seleção de Parcelas -->
+    <div
+      class="modal fade"
+      id="modalSelecionarParcelas"
+      tabindex="-1"
+      role="dialog"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">
+              <i class="fas fa-check-square"></i> Selecionar Parcelas para Pagar
+            </h5>
+            <button class="close text-white" data-dismiss="modal">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted mb-3">
+              <strong id="descricaoParcelada"></strong>
+            </p>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover">
+                <thead>
+                  <tr>
+                    <th width="50">
+                      <input
+                        type="checkbox"
+                        id="checkAllParcelas"
+                        onchange="toggleTodasParcelas()"
+                      />
+                    </th>
+                    <th>Parcela</th>
+                    <th>Vencimento</th>
+                    <th>Valor</th>
+                    <th class="text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="listaParcelasModal"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-dismiss="modal">
+              Cancelar
+            </button>
+            <button
+              class="btn btn-success"
+              onclick="marcarParcelasSelecionadas()"
+            >
+              <i class="fas fa-check"></i> Marcar Selecionadas como Pagas
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div
       class="modal fade"
       id="modalRegistraDespesa"
@@ -335,6 +425,9 @@
         document.getElementById("mes").value = "";
         document.getElementById("tipo").value = "";
         document.getElementById("descricao").value = "";
+        if (document.getElementById("statusPago")) {
+          document.getElementById("statusPago").value = "";
+        }
         carregaListaDespesas();
       }
 
@@ -351,6 +444,9 @@
 
         // 🔧 CONTAR REGISTROS AGRUPADOS (sem data para agrupar parceladas)
         const grupos = new Map();
+        let countPagas = 0;
+        let countNaoPagas = 0;
+
         d.forEach((item) => {
           // Extrair descrição base de forma robusta
           const descricaoBase = item.descricao.includes("(")
@@ -362,12 +458,41 @@
           const chave = `${descricaoBase}_${item.tipo}_${item.cartao || ""}`;
 
           if (!grupos.has(chave)) {
-            grupos.set(chave, true);
+            // Verificar se é parcelada
+            const parcelas = d.filter((p) => {
+              const pBase = p.descricao.includes("(")
+                ? p.descricao.substring(0, p.descricao.lastIndexOf("(")).trim()
+                : p.descricao;
+              return (
+                pBase === descricaoBase &&
+                p.tipo === item.tipo &&
+                p.cartao === item.cartao
+              );
+            });
+
+            grupos.set(chave, parcelas);
+
+            // Contar status de pago INDIVIDUALMENTE para cada parcela
+            parcelas.forEach((p) => {
+              if (p.pago === true) {
+                countPagas++;
+              } else {
+                countNaoPagas++;
+              }
+            });
           }
         });
 
         const countRegistros = grupos.size;
         document.getElementById("totalRegistros").textContent = countRegistros;
+
+        // Atualizar contadores de status se existirem
+        if (document.getElementById("countPagas")) {
+          document.getElementById("countPagas").textContent = countPagas;
+        }
+        if (document.getElementById("countNaoPagas")) {
+          document.getElementById("countNaoPagas").textContent = countNaoPagas;
+        }
 
         const filtrosAtivos =
           document.getElementById("ano").value ||
@@ -375,31 +500,53 @@
           document.getElementById("tipo").value ||
           document.getElementById("descricao").value;
 
-        let totalFinal = total;
+        // 💰 CÁLCULO DE TOTAIS
+        let totalGeral = total;
+
         if (!filtrosAtivos) {
           const totalFaturaStr = localStorage.getItem("totalFaturaImportada");
           const totalFatura = totalFaturaStr ? parseFloat(totalFaturaStr) : NaN;
           if (!isNaN(totalFatura) && totalFatura > 0) {
-            totalFinal = totalFatura;
+            totalGeral = totalFatura;
           }
         }
 
-        // Formatar valor com separador de milhar
-        const totalFormatado = totalFinal
-          .toFixed(2)
-          .replace(".", ",")
-          .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        // Calcular: apenas não pagas
+        let totalAPagar = 0;
+
+        d.forEach((item) => {
+          if (item.pago !== true) {
+            totalAPagar += parseFloat(item.valor) || 0;
+          }
+        });
+
+        // Total Geral = apenas despesas não pagas
+        totalGeral = totalAPagar;
+
+        // Função para formatar valores
+        const formatarMoeda = (valor) => {
+          return valor
+            .toFixed(2)
+            .replace(".", ",")
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        };
+
+        // Atualizar elementos DOM
+        document.getElementById("totalGeral").textContent =
+          `R$ ${formatarMoeda(totalGeral)}`;
         document.getElementById("totalDespesas").textContent =
-          `R$ ${totalFormatado}`;
+          `R$ ${formatarMoeda(totalAPagar)}`;
+
+        // Atualizar totalPendentes se existir (compatibilidade)
+        if (document.getElementById("totalPendentes")) {
+          document.getElementById("totalPendentes").textContent =
+            `R$ ${formatarMoeda(totalAPagar)}`;
+        }
       };
 
-      document.addEventListener("DOMContentLoaded", () => {
-        console.log("DOM carregado em consulta.html");
-
-        preencherCategorias();
-        carregaListaDespesas();
-        carregarCartoesNoPdfImport();
-      });
+      // Carregar a lista inicial
+      carregaListaDespesas();
+      carregarCartoesNoPdfImport();
     </script>
   </body>
 </html>
